@@ -4,6 +4,9 @@ const fs = require('fs').promises;
 const path = require('path');
 require('dotenv').config();
 
+// Import chokidar for file watching
+const chokidar = require('chokidar');
+
 const app = express();
 const PORT = process.env.PORT || 3001;
 const DATA_FILE = process.env.DATA_FILE || './data/cashflow.json';
@@ -11,8 +14,24 @@ const TASKS_FILE = '/root/.openclaw/workspace/tasks.json';
 const ACTIVITY_LOGS_FILE = '/root/.openclaw/workspace/activity_logs.json';
 const WEB_PASSWORD = process.env.WEB_PASSWORD;
 
+// Track manual changes from web app
+let isManualWebAppChange = false;
+
 app.use(cors());
 app.use(express.json());
+
+// Middleware to track manual web app changes
+app.use((req, res, next) => {
+  // Mark as manual change if it's a task API request
+  if (req.path.startsWith('/api/tasks') && req.method !== 'GET') {
+    isManualWebAppChange = true;
+    // Reset flag after a short delay
+    setTimeout(() => {
+      isManualWebAppChange = false;
+    }, 1000);
+  }
+  next();
+});
 
 // Auth middleware
 const verifyPassword = (req, res, next) => {
@@ -145,7 +164,432 @@ async function cleanupOldLogs() {
 // Schedule cleanup to run every 24 hours
 setInterval(cleanupOldLogs, 24 * 60 * 60 * 1000);
 
-// GET /api/cashflow - Get all entries
+// Initialize task file watcher
+initializeTaskWatcher();
+
+// Task file watching for automatic activity logging
+let tasksWatcher = null;
+let lastTaskContent = null;
+
+async function initializeTaskWatcher() {
+  try {
+    // Read initial content
+    lastTaskContent = await fs.readFile(TASKS_FILE, 'utf8');
+    
+    // Watch for changes
+    tasksWatcher = chokidar.watch(TASKS_FILE);
+    
+    tasksWatcher.on('change', async () => {
+      if (isManualWebAppChange) {
+        isManualWebAppChange = false;
+        return;
+      }
+      
+      try {
+        const newContent = await fs.readFile(TASKS_FILE, 'utf8');
+        if (newContent === lastTaskContent) {
+          return;
+        }
+        
+        const oldTasks = JSON.parse(lastTaskContent);
+        const newTasks = JSON.parse(newContent);
+        const changes = detectTaskChanges(oldTasks, newTasks);
+        
+        // Log detected changes
+        for (const change of changes) {
+          await logActivity(
+            change.type,
+            change.description,
+            change.details,
+            'success',
+            null,
+            'telegram'
+          );
+        }
+        
+        lastTaskContent = newContent;
+      } catch (error) {
+        console.error('Error watching tasks:', error);
+      }
+    });
+    
+    console.log('Task file watcher initialized');
+  } catch (error) {
+    console.error('Failed to initialize task watcher:', error);
+  }
+}
+
+function detectTaskChanges(oldTasks, newTasks) {
+  const changes = [];
+  const oldIds = new Set(oldTasks.tasks?.map(t => t.id) || []);
+  const newIds = new Set(newTasks.tasks?.map(t => t.id) || []);
+  const oldTaskMap = new Map(oldTasks.tasks?.map(t => [t.id, t]) || []);
+  const newTaskMap = new Map(newTasks.tasks?.map(t => [t.id, t]) || []);
+  
+  // Detect deletions
+  for (const id of oldIds) {
+    if (!newIds.has(id)) {
+      const task = oldTaskMap.get(id);
+      changes.push({
+        type: 'task_delete',
+        description: `Deleted task: ${task.name}`,
+        details: { task_id: id, task_name: task.name }
+      });
+    }
+  }
+  
+  // Detect additions
+  for (const id of newIds) {
+    if (!oldIds.has(id)) {
+      const task = newTaskMap.get(id);
+      changes.push({
+        type: 'task_create',
+        description: `Added task: ${task.name}`,
+        details: {
+          task_id: id,
+          task_name: task.name,
+          priority: task.priority || 'medium',
+          date: task.date || '',
+          time: task.time || ''
+        }
+      });
+    }
+  }
+  
+  // Detect updates
+  for (const task of newTasks.tasks || []) {
+    const oldTask = oldTaskMap.get(task.id);
+    if (oldTask && JSON.stringify(oldTask) !== JSON.stringify(task)) {
+      const changedFields = [];
+      if (oldTask.name !== task.name) changedFields.push('name');
+      if (oldTask.priority !== task.priority) changedFields.push('priority');
+      if (oldTask.date !== task.date) changedFields.push('date');
+      if (oldTask.time !== task.time) changedFields.push('time');
+      
+      changes.push({
+        type: 'task_update',
+        description: `Updated task: ${task.name}`,
+        details: {
+          task_id: task.id,
+          task_name: task.name,
+          changed_fields: changedFields,
+          old_values: oldTask,
+          new_values: task
+        }
+      });
+    }
+  }
+  
+  return changes;
+}
+
+// ============================================================================
+// CENTRALIZED ACTIVITY LOGGER SERVICE
+// All task and cashflow operations automatically log activities
+// ============================================================================
+
+const ActivityLogger = {
+  /**
+   * Log a task creation
+   */
+  async logTaskCreate(task, source = 'telegram') {
+    await logActivity(
+      'task_create',
+      `Added task: ${task.name}`,
+      {
+        task_id: task.id,
+        task_name: task.name,
+        priority: task.priority || 'medium',
+        date: task.date || '',
+        time: task.time || ''
+      },
+      'success',
+      null,
+      source
+    );
+  },
+
+  /**
+   * Log a task update
+   */
+  async logTaskUpdate(task, oldTask, source = 'telegram') {
+    const changedFields = [];
+    if (oldTask.name !== task.name) changedFields.push('name');
+    if (oldTask.priority !== task.priority) changedFields.push('priority');
+    if (oldTask.date !== task.date) changedFields.push('date');
+    if (oldTask.time !== task.time) changedFields.push('time');
+
+    await logActivity(
+      'task_update',
+      `Updated task: ${task.name}`,
+      {
+        task_id: task.id,
+        task_name: task.name,
+        changed_fields: changedFields,
+        old_values: oldTask,
+        new_values: task
+      },
+      'success',
+      null,
+      source
+    );
+  },
+
+  /**
+   * Log a task deletion
+   */
+  async logTaskDelete(task, source = 'telegram') {
+    await logActivity(
+      'task_delete',
+      `Deleted task: ${task.name}`,
+      {
+        task_id: task.id,
+        task_name: task.name
+      },
+      'success',
+      null,
+      source
+    );
+  },
+
+  /**
+   * Log a cashflow entry addition
+   */
+  async logCashflowAdd(entry, source = 'web_app') {
+    await logActivity(
+      'cashflow_add',
+      `Added ${entry.type}: ${entry.item} ${entry.amount} ${entry.currency}`,
+      {
+        item: entry.item,
+        amount: entry.amount,
+        currency: entry.currency,
+        category: entry.category
+      },
+      'success',
+      null,
+      source
+    );
+  },
+
+  /**
+   * Log a cashflow entry deletion
+   */
+  async logCashflowDelete(entry, source = 'web_app') {
+    await logActivity(
+      'cashflow_delete',
+      `Deleted ${entry.type}: ${entry.item} ${entry.amount} ${entry.currency}`,
+      {
+        entry_id: entry.id,
+        item: entry.item,
+        amount: entry.amount,
+        currency: entry.currency
+      },
+      'success',
+      null,
+      source
+    );
+  }
+};
+
+// ============================================================================
+// NEW API ENDPOINTS FOR EMILY (AI AGENT)
+// These endpoints auto-log all activities
+// ============================================================================
+
+/**
+ * POST /api/emily/tasks/create
+ * Emily calls this to create a task - logging is automatic
+ */
+app.post('/api/emily/tasks/create', verifyPassword, async (req, res) => {
+  try {
+    const { name, priority, date, time, source } = req.body;
+
+    // Validate required fields
+    if (!name) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Task name is required' 
+      });
+    }
+
+    const tasks = await readTasks();
+    
+    // Generate new ID
+    const existingIds = tasks.map(t => parseInt(t.id) || 0);
+    const newId = existingIds.length > 0 
+      ? (Math.max(...existingIds) + 1).toString().padStart(3, '0')
+      : '001';
+
+    // Create task
+    const newTask = {
+      id: newId,
+      name: name.trim(),
+      date: date || '',
+      time: time || '',
+      status: 'active',
+      priority: priority || 'medium'
+    };
+
+    tasks.push(newTask);
+    await writeTasks(tasks);
+
+    // Auto-log activity
+    await ActivityLogger.logTaskCreate(newTask, source || 'telegram');
+
+    res.json({
+      success: true,
+      task: newTask,
+      activity_logged: true
+    });
+  } catch (error) {
+    console.error('Error creating task:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: error.message 
+    });
+  }
+});
+
+/**
+ * POST /api/emily/tasks/update/:id
+ * Emily calls this to update a task - logging is automatic
+ */
+app.post('/api/emily/tasks/update/:id', verifyPassword, async (req, res) => {
+  try {
+    const { name, priority, date, time, source } = req.body;
+    const taskId = req.params.id;
+
+    const tasks = await readTasks();
+    const index = tasks.findIndex(t => t.id === taskId);
+
+    if (index === -1) {
+      return res.status(404).json({ 
+        success: false, 
+        error: 'Task not found' 
+      });
+    }
+
+    const oldTask = { ...tasks[index] };
+    
+    // Update fields
+    if (name !== undefined) tasks[index].name = name.trim();
+    if (priority !== undefined) tasks[index].priority = priority;
+    if (date !== undefined) tasks[index].date = date;
+    if (time !== undefined) tasks[index].time = time;
+
+    await writeTasks(tasks);
+
+    // Auto-log activity
+    await ActivityLogger.logTaskUpdate(tasks[index], oldTask, source || 'telegram');
+
+    res.json({
+      success: true,
+      task: tasks[index],
+      changes: { name, priority, date, time },
+      activity_logged: true
+    });
+  } catch (error) {
+    console.error('Error updating task:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: error.message 
+    });
+  }
+});
+
+/**
+ * POST /api/emily/tasks/delete/:id
+ * Emily calls this to delete a task - logging is automatic
+ */
+app.post('/api/emily/tasks/delete/:id', verifyPassword, async (req, res) => {
+  try {
+    const taskId = req.params.id;
+    const { source } = req.body;
+
+    const tasks = await readTasks();
+    const index = tasks.findIndex(t => t.id === taskId);
+
+    if (index === -1) {
+      return res.status(404).json({ 
+        success: false, 
+        error: 'Task not found' 
+      });
+    }
+
+    const deletedTask = tasks[index];
+    tasks.splice(index, 1);
+    await writeTasks(tasks);
+
+    // Auto-log activity
+    await ActivityLogger.logTaskDelete(deletedTask, source || 'telegram');
+
+    res.json({
+      success: true,
+      deleted_task_id: taskId,
+      deleted_task_name: deletedTask.name,
+      activity_logged: true
+    });
+  } catch (error) {
+    console.error('Error deleting task:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: error.message 
+    });
+  }
+});
+
+/**
+ * POST /api/emily/tasks/delete-by-name
+ * Emily calls this to delete a task by name - logging is automatic
+ */
+app.post('/api/emily/tasks/delete-by-name', verifyPassword, async (req, res) => {
+  try {
+    const { task_name, source } = req.body;
+
+    if (!task_name) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Task name is required' 
+      });
+    }
+
+    const tasks = await readTasks();
+    const index = tasks.findIndex(t => 
+      t.name.toLowerCase() === task_name.toLowerCase()
+    );
+
+    if (index === -1) {
+      return res.status(404).json({ 
+        success: false, 
+        error: `Task "${task_name}" not found` 
+      });
+    }
+
+    const deletedTask = tasks[index];
+    tasks.splice(index, 1);
+    await writeTasks(tasks);
+
+    // Auto-log activity
+    await ActivityLogger.logTaskDelete(deletedTask, source || 'telegram');
+
+    res.json({
+      success: true,
+      deleted_task_id: deletedTask.id,
+      deleted_task_name: deletedTask.name,
+      activity_logged: true
+    });
+  } catch (error) {
+    console.error('Error deleting task by name:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: error.message 
+    });
+  }
+});
+
+// ============================================================================
+// EXISTING API ENDPOINTS
+// ============================================================================
 app.get('/api/cashflow', verifyPassword, async (req, res) => {
   try {
     const data = await readData();
@@ -393,11 +837,10 @@ async function writeTasks(tasks) {
 
 // Helper: Generate next task ID
 function generateTaskId(tasks) {
-  const maxId = tasks.reduce((max, task) => {
-    const num = parseInt(task.id, 10);
-    return num > max ? num : max;
-  }, 0);
-  return String(maxId + 1).padStart(3, '0');
+  // Always generate sequential IDs starting from 001
+  // This prevents ID conflicts by using the array length as the counter
+  const nextNumber = (tasks.length || 0) + 1;
+  return String(nextNumber).padStart(3, '0');
 }
 
 // GET /api/tasks - Get all tasks
@@ -415,8 +858,8 @@ app.post('/api/tasks', verifyPassword, async (req, res) => {
   try {
     const tasks = await readTasks();
     
-    // Determine source from request body (default to 'web_app')
-    const source = req.body.source || 'web_app';
+    // Source is determined by middleware
+    const source = isManualWebAppChange ? 'web_app' : 'telegram';
     
     const newTask = {
       id: generateTaskId(tasks),
@@ -447,8 +890,8 @@ app.post('/api/tasks', verifyPassword, async (req, res) => {
     
     res.status(201).json(newTask);
   } catch (error) {
-    // Determine source from request body (default to 'web_app')
-    const source = req.body.source || 'web_app';
+    // Source is determined by middleware
+    const source = isManualWebAppChange ? 'web_app' : 'telegram';
     
     await logActivity(
       'task_create',
@@ -468,8 +911,8 @@ app.put('/api/tasks/:id', verifyPassword, async (req, res) => {
     const tasks = await readTasks();
     const index = tasks.findIndex(t => t.id === req.params.id);
     
-    // Determine source from request body (default to 'web_app')
-    const source = req.body.source || 'web_app';
+    // Source is determined by middleware
+    const source = isManualWebAppChange ? 'web_app' : 'telegram';
     
     if (index === -1) {
       await logActivity(
@@ -508,8 +951,8 @@ app.put('/api/tasks/:id', verifyPassword, async (req, res) => {
     
     res.json(tasks[index]);
   } catch (error) {
-    // Determine source from request body (default to 'web_app')
-    const source = req.body.source || 'web_app';
+    // Source is determined by middleware
+    const source = isManualWebAppChange ? 'web_app' : 'telegram';
     
     await logActivity(
       'task_update',
@@ -529,8 +972,8 @@ app.delete('/api/tasks/:id', verifyPassword, async (req, res) => {
     const tasks = await readTasks();
     const index = tasks.findIndex(t => t.id === req.params.id);
     
-    // Determine source from query params (default to 'web_app')
-    const source = req.query.source || 'web_app';
+    // Source is determined by middleware
+    const source = isManualWebAppChange ? 'web_app' : 'telegram';
     
     if (index === -1) {
       await logActivity(
@@ -563,8 +1006,8 @@ app.delete('/api/tasks/:id', verifyPassword, async (req, res) => {
     
     res.status(204).send();
   } catch (error) {
-    // Determine source from query params (default to 'web_app')
-    const source = req.query.source || 'web_app';
+    // Source is determined by middleware
+    const source = isManualWebAppChange ? 'web_app' : 'telegram';
     
     await logActivity(
       'task_delete',
