@@ -4,10 +4,12 @@ import PasswordGate from './components/PasswordGate';
 import SummaryCards from './components/SummaryCards';
 import FilterBar from './components/FilterBar';
 import CashflowTable from './components/CashflowTable';
+import ActivityManager from './components/ActivityManager';
 import { cashflowAPI } from './api/cashflow';
 
 export default function App() {
   const { isAuthenticated, login, logout } = useAuth();
+  const [activeTab, setActiveTab] = useState('cashflow');
   const [entries, setEntries] = useState([]);
   const [summary, setSummary] = useState({ totalIncome: 0, totalExpenses: 0, balance: 0, transactionCount: 0 });
   const [filters, setFilters] = useState({ category: 'All', currency: 'All', search: '' });
@@ -58,8 +60,8 @@ export default function App() {
       <div className="container mx-auto px-4 py-8">
         <div className="flex justify-between items-center mb-8">
           <div>
-            <h1 className="text-3xl font-bold text-white">💰 Cashflow Manager</h1>
-            <p className="text-gray-400">Track your expenses and earnings</p>
+            <h1 className="text-3xl font-bold text-white">🥖 Emily's web app</h1>
+            <p className="text-gray-400">Manage your cashflow and activities</p>
           </div>
           <button
             onClick={logout}
@@ -69,14 +71,45 @@ export default function App() {
           </button>
         </div>
 
-        <SummaryCards summary={summary} />
+        {/* Tab Navigation */}
+        <div className="border-b border-gray-700 mb-8">
+          <div className="flex gap-8">
+            <button
+              onClick={() => setActiveTab('cashflow')}
+              className={`pb-4 text-lg font-medium transition-colors border-b-2 ${
+                activeTab === 'cashflow'
+                  ? 'text-white border-blue-500'
+                  : 'text-gray-400 border-transparent hover:text-white'
+              }`}
+            >
+              Cashflow Manager
+            </button>
+            <button
+              onClick={() => setActiveTab('activity')}
+              className={`pb-4 text-lg font-medium transition-colors border-b-2 ${
+                activeTab === 'activity'
+                  ? 'text-white border-blue-500'
+                  : 'text-gray-400 border-transparent hover:text-white'
+              }`}
+            >
+              Activity Manager
+            </button>
+          </div>
+        </div>
 
-        <FilterBar onFilterChange={handleFilterChange} />
-
-        {loading ? (
-          <div className="text-center text-gray-400 py-8">Loading...</div>
+        {/* Tab Content */}
+        {activeTab === 'cashflow' ? (
+          <div>
+            <SummaryCards summary={summary} />
+            <FilterBar onFilterChange={handleFilterChange} />
+            {loading ? (
+              <div className="text-center text-gray-400 py-8">Loading...</div>
+            ) : (
+              <CashflowTable entries={entries} onDelete={handleDelete} />
+            )}
+          </div>
         ) : (
-          <CashflowTable entries={entries} onDelete={handleDelete} />
+          <ActivityManager />
         )}
       </div>
     </div>
