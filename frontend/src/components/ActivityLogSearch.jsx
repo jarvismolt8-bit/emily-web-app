@@ -2,17 +2,14 @@ import { useState } from 'react';
 
 const ACTION_TYPES = [
   { value: '', label: 'All Types' },
-  { value: 'cashflow_add', label: 'Cashflow - Add' },
-  { value: 'cashflow_update', label: 'Cashflow - Update' },
-  { value: 'cashflow_delete', label: 'Cashflow - Delete' },
-  { value: 'task_create', label: 'Task - Create' },
-  { value: 'task_update', label: 'Task - Update' },
-  { value: 'task_delete', label: 'Task - Delete' },
-  { value: 'todo_add', label: 'Todo - Add' },
-  { value: 'todo_delete', label: 'Todo - Delete' },
-  { value: 'todo_complete', label: 'Todo - Complete' },
-  { value: 'report_generate', label: 'Report - Generate' },
-  { value: 'query_answered', label: 'Query - Answered' }
+  { value: 'cashflow_add', label: '💰 Cashflow - Add' },
+  { value: 'cashflow_update', label: '💰 Cashflow - Update' },
+  { value: 'cashflow_delete', label: '💰 Cashflow - Delete' },
+  { value: 'task_create', label: '📋 Task - Create' },
+  { value: 'task_update', label: '📋 Task - Update' },
+  { value: 'task_delete', label: '📋 Task - Delete' },
+  { value: 'report_generate', label: '📊 Report - Generate' },
+  { value: 'query_answered', label: '💬 Query - Answered' }
 ];
 
 const STATUSES = [

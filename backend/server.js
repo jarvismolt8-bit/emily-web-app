@@ -221,6 +221,9 @@ app.post('/api/cashflow', verifyPassword, async (req, res) => {
     data.push(newEntry);
     await writeData(data);
     
+    // Determine source from request body (default to 'web_app')
+    const source = req.body.source || 'web_app';
+    
     // Log the activity
     await logActivity(
       'cashflow_add',
@@ -233,11 +236,14 @@ app.post('/api/cashflow', verifyPassword, async (req, res) => {
       },
       'success',
       null,
-      'web_app'
+      source
     );
     
     res.status(201).json(newEntry);
   } catch (error) {
+    // Determine source from request body (default to 'web_app')
+    const source = req.body.source || 'web_app';
+    
     // Log the failure
     await logActivity(
       'cashflow_add',
@@ -245,7 +251,7 @@ app.post('/api/cashflow', verifyPassword, async (req, res) => {
       { item: req.body.item },
       'failed',
       error.message,
-      'web_app'
+      source
     );
     res.status(500).json({ error: error.message });
   }
@@ -257,6 +263,9 @@ app.put('/api/cashflow/:id', verifyPassword, async (req, res) => {
     const data = await readData();
     const index = data.findIndex(e => e.id === req.params.id);
     
+    // Determine source from request body (default to 'web_app')
+    const source = req.body.source || 'web_app';
+    
     if (index === -1) {
       await logActivity(
         'cashflow_update',
@@ -264,7 +273,7 @@ app.put('/api/cashflow/:id', verifyPassword, async (req, res) => {
         { entry_id: req.params.id },
         'failed',
         'Entry not found',
-        'web_app'
+        source
       );
       return res.status(404).json({ error: 'Entry not found' });
     }
@@ -289,18 +298,21 @@ app.put('/api/cashflow/:id', verifyPassword, async (req, res) => {
       },
       'success',
       null,
-      'web_app'
+      source
     );
     
     res.json(data[index]);
   } catch (error) {
+    // Determine source from request body (default to 'web_app')
+    const source = req.body.source || 'web_app';
+    
     await logActivity(
       'cashflow_update',
       `Failed to update cashflow entry: ${req.params.id}`,
       { entry_id: req.params.id },
       'failed',
       error.message,
-      'web_app'
+      source
     );
     res.status(500).json({ error: error.message });
   }
@@ -312,6 +324,9 @@ app.delete('/api/cashflow/:id', verifyPassword, async (req, res) => {
     const data = await readData();
     const index = data.findIndex(e => e.id === req.params.id);
     
+    // Determine source from query params (default to 'web_app')
+    const source = req.query.source || 'web_app';
+    
     if (index === -1) {
       await logActivity(
         'cashflow_delete',
@@ -319,7 +334,7 @@ app.delete('/api/cashflow/:id', verifyPassword, async (req, res) => {
         { entry_id: req.params.id },
         'failed',
         'Entry not found',
-        'web_app'
+        source
       );
       return res.status(404).json({ error: 'Entry not found' });
     }
@@ -338,18 +353,21 @@ app.delete('/api/cashflow/:id', verifyPassword, async (req, res) => {
       },
       'success',
       null,
-      'web_app'
+      source
     );
     
     res.status(204).send();
   } catch (error) {
+    // Determine source from query params (default to 'web_app')
+    const source = req.query.source || 'web_app';
+    
     await logActivity(
       'cashflow_delete',
       `Failed to delete cashflow entry: ${req.params.id}`,
       { entry_id: req.params.id },
       'failed',
       error.message,
-      'web_app'
+      source
     );
     res.status(500).json({ error: error.message });
   }
@@ -397,6 +415,9 @@ app.post('/api/tasks', verifyPassword, async (req, res) => {
   try {
     const tasks = await readTasks();
     
+    // Determine source from request body (default to 'web_app')
+    const source = req.body.source || 'web_app';
+    
     const newTask = {
       id: generateTaskId(tasks),
       name: req.body.name,
@@ -421,18 +442,21 @@ app.post('/api/tasks', verifyPassword, async (req, res) => {
       },
       'success',
       null,
-      'web_app'
+      source
     );
     
     res.status(201).json(newTask);
   } catch (error) {
+    // Determine source from request body (default to 'web_app')
+    const source = req.body.source || 'web_app';
+    
     await logActivity(
       'task_create',
       `Failed to create task: ${req.body.name}`,
       { task_name: req.body.name },
       'failed',
       error.message,
-      'web_app'
+      source
     );
     res.status(500).json({ error: error.message });
   }
@@ -444,6 +468,9 @@ app.put('/api/tasks/:id', verifyPassword, async (req, res) => {
     const tasks = await readTasks();
     const index = tasks.findIndex(t => t.id === req.params.id);
     
+    // Determine source from request body (default to 'web_app')
+    const source = req.body.source || 'web_app';
+    
     if (index === -1) {
       await logActivity(
         'task_update',
@@ -451,7 +478,7 @@ app.put('/api/tasks/:id', verifyPassword, async (req, res) => {
         { task_id: req.params.id },
         'failed',
         'Task not found',
-        'web_app'
+        source
       );
       return res.status(404).json({ error: 'Task not found' });
     }
@@ -476,18 +503,21 @@ app.put('/api/tasks/:id', verifyPassword, async (req, res) => {
       },
       'success',
       null,
-      'web_app'
+      source
     );
     
     res.json(tasks[index]);
   } catch (error) {
+    // Determine source from request body (default to 'web_app')
+    const source = req.body.source || 'web_app';
+    
     await logActivity(
       'task_update',
       `Failed to update task: ${req.params.id}`,
       { task_id: req.params.id },
       'failed',
       error.message,
-      'web_app'
+      source
     );
     res.status(500).json({ error: error.message });
   }
@@ -499,6 +529,9 @@ app.delete('/api/tasks/:id', verifyPassword, async (req, res) => {
     const tasks = await readTasks();
     const index = tasks.findIndex(t => t.id === req.params.id);
     
+    // Determine source from query params (default to 'web_app')
+    const source = req.query.source || 'web_app';
+    
     if (index === -1) {
       await logActivity(
         'task_delete',
@@ -506,7 +539,7 @@ app.delete('/api/tasks/:id', verifyPassword, async (req, res) => {
         { task_id: req.params.id },
         'failed',
         'Task not found',
-        'web_app'
+        source
       );
       return res.status(404).json({ error: 'Task not found' });
     }
@@ -525,18 +558,21 @@ app.delete('/api/tasks/:id', verifyPassword, async (req, res) => {
       },
       'success',
       null,
-      'web_app'
+      source
     );
     
     res.status(204).send();
   } catch (error) {
+    // Determine source from query params (default to 'web_app')
+    const source = req.query.source || 'web_app';
+    
     await logActivity(
       'task_delete',
       `Failed to delete task: ${req.params.id}`,
       { task_id: req.params.id },
       'failed',
       error.message,
-      'web_app'
+      source
     );
     res.status(500).json({ error: error.message });
   }
