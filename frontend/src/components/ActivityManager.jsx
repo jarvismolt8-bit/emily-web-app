@@ -2,8 +2,10 @@ import { useState, useEffect } from 'react';
 import { tasksAPI } from '../api/tasks';
 import TaskTable from './TaskTable';
 import TaskModal from './TaskModal';
+import ActivityLogs from './ActivityLogs';
 
 export default function ActivityManager() {
+  const [activeTab, setActiveTab] = useState('tasks');
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -21,8 +23,10 @@ export default function ActivityManager() {
   };
 
   useEffect(() => {
-    fetchTasks();
-  }, []);
+    if (activeTab === 'tasks') {
+      fetchTasks();
+    }
+  }, [activeTab]);
 
   const handleAdd = () => {
     setEditingTask(null);
@@ -65,31 +69,64 @@ export default function ActivityManager() {
 
   return (
     <div>
-      <div className="flex justify-between items-center mb-6">
-        <div>
-          <h2 className="text-2xl font-bold text-white">Activity Manager</h2>
-          <p className="text-gray-400">Manage your tasks and activities</p>
+      {/* Sub-tabs for Tasks and Activity Logs */}
+      <div className="border-b border-slate-700 mb-4 md:mb-6">
+        <div className="flex">
+          <button
+            onClick={() => setActiveTab('tasks')}
+            className={`px-4 md:px-6 py-2 md:py-3 font-medium transition-colors border-b-2 ${
+              activeTab === 'tasks'
+                ? 'text-white border-blue-500'
+                : 'text-slate-400 border-transparent hover:text-white'
+            }`}
+          >
+            Tasks
+          </button>
+          <button
+            onClick={() => setActiveTab('logs')}
+            className={`px-4 md:px-6 py-2 md:py-3 font-medium transition-colors border-b-2 ${
+              activeTab === 'logs'
+                ? 'text-white border-blue-500'
+                : 'text-slate-400 border-transparent hover:text-white'
+            }`}
+          >
+            Activity Logs
+          </button>
         </div>
-        <button
-          onClick={handleAdd}
-          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded flex items-center gap-2"
-        >
-          <span>+</span> Add Task
-        </button>
       </div>
 
-      {loading ? (
-        <div className="text-center text-gray-400 py-8">Loading...</div>
-      ) : (
-        <TaskTable tasks={tasks} onEdit={handleEdit} onDelete={handleDelete} />
-      )}
+      {/* Tab Content */}
+      {activeTab === 'tasks' ? (
+        <div>
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 md:gap-0 mb-4 md:mb-6">
+            <div>
+              <h2 className="text-xl md:text-2xl font-bold text-white">Tasks</h2>
+              <p className="text-slate-400 mt-1 text-sm md:text-base">Manage your tasks</p>
+            </div>
+            <button
+              onClick={handleAdd}
+              className="border border-slate-600 hover:bg-slate-800 text-slate-300 px-3 md:px-4 py-1.5 md:py-2 flex items-center gap-2 transition-colors text-sm md:text-base w-full md:w-auto justify-center"
+            >
+              <span>+</span> <span className="md:hidden">Add</span><span className="hidden md:inline">Add Task</span>
+            </button>
+          </div>
 
-      <TaskModal
-        isOpen={isModalOpen}
-        onClose={handleCloseModal}
-        onSave={handleSave}
-        task={editingTask}
-      />
+          {loading ? (
+            <div className="text-center text-slate-400 py-8">Loading...</div>
+          ) : (
+            <TaskTable tasks={tasks} onEdit={handleEdit} onDelete={handleDelete} />
+          )}
+
+          <TaskModal
+            isOpen={isModalOpen}
+            onClose={handleCloseModal}
+            onSave={handleSave}
+            task={editingTask}
+          />
+        </div>
+      ) : (
+        <ActivityLogs />
+      )}
     </div>
   );
 }
