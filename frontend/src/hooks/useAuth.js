@@ -7,14 +7,17 @@ export function useAuth() {
 
   useEffect(() => {
     const storedAuth = localStorage.getItem('cashflow_auth');
-    if (storedAuth === 'true') {
+    const storedPassword = localStorage.getItem('web_password');
+    if (storedAuth === 'true' && storedPassword) {
       setIsAuthenticated(true);
+      setPassword(storedPassword);
     }
   }, []);
 
   const login = (inputPassword) => {
     if (inputPassword === correctPassword) {
       localStorage.setItem('cashflow_auth', 'true');
+      localStorage.setItem('web_password', inputPassword);
       setIsAuthenticated(true);
       return true;
     }
@@ -23,6 +26,7 @@ export function useAuth() {
 
   const logout = () => {
     localStorage.removeItem('cashflow_auth');
+    localStorage.removeItem('web_password');
     setIsAuthenticated(false);
     setPassword('');
   };

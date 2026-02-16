@@ -2,10 +2,16 @@ const express = require('express');
 const cors = require('cors');
 const fs = require('fs').promises;
 const path = require('path');
+const http = require('http');
+const WebSocket = require('ws');
 require('dotenv').config();
 
 // Import chokidar for file watching
 const chokidar = require('chokidar');
+
+// Import gateway client
+const gatewayClient = require('./gateway-client');
+const commandHandler = require('./chat-commands');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -520,7 +526,7 @@ app.post('/api/emily/tasks/delete/:id', verifyPassword, async (req, res) => {
     tasks.splice(index, 1);
     await writeTasks(tasks);
 
-    // Auto-log activity
+    // Auto-log activity 
     await ActivityLogger.logTaskDelete(deletedTask, source || 'telegram');
 
     res.json({
@@ -1156,18 +1162,198 @@ app.post('/api/activity-logs', verifyPassword, async (req, res) => {
   }
 });
 
-// Start server
+// ============================================================================
+// WEBSOCKET CHAT SERVER
+// Handles real-time chat between web clients and Emily
+// ============================================================================
+
+// Create HTTP server
+const server = http.createServer(app);
+
+// Create WebSocket server for chat
+const wss = new WebSocket.Server({ 
+  server,
+  path: '/api/chat',
+  verifyClient: (info, cb) => {
+    // Verify password from query params
+    const url = new URL(info.req.url, `http://${info.req.headers.host}`);
+    const password = url.searchParams.get('password');
+    
+    if (password === WEB_PASSWORD) {
+      cb(true);
+    } else {
+      cb(false, 401, 'Unauthorized');
+    }
+  }
+});
+
+// Track active chat sessions
+const chatSessions = new Map();
+
+wss.on('connection', (ws, req) => {
+  const url = new URL(req.url, `http://${req.headers.host}`);
+  const sessionId = url.searchParams.get('session') || `webchat-${Date.now()}`;
+  const userId = url.searchParams.get('userId') || 'anonymous';
+  const sessionKey = `agent:main:webchat:${userId}`; 
+  
+  console.log(`[Chat] Client connected - Session: ${sessionKey}`);
+  
+  // Register client with gateway
+  gatewayClient.registerClient(sessionKey, ws);
+  
+  // Send welcome message
+  ws.send(JSON.stringify({
+    type: 'system',
+    content: 'Connected to Emily. How can I help you today?',
+    timestamp: new Date().toISOString()
+  }));
+  
+  // Handle messages from client
+  ws.on('message', async (data) => {
+    try {
+      const message = JSON.parse(data.toString());
+      
+      if (message.type === 'message') {
+        // Broadcast user message to all clients in session (for cross-device sync)
+        const userMessage = {
+          type: 'message',
+          sender: 'user',
+          content: message.content,
+          timestamp: new Date().toISOString(),
+          clientId: sessionId // Add unique client ID to identify sender
+        };
+        
+        gatewayClient.broadcastToSession(sessionKey, userMessage);
+        
+        // Check if it's a command
+        const parsedCommand = commandHandler.parseCommand(message.content);
+        
+        // Forward all messages to Emily - let her handle all responses
+        // (Local command handler disabled to prevent duplicate responses)
+        try {
+          // Send typing indicator
+          ws.send(JSON.stringify({
+            type: 'typing',
+            sender: 'emily',
+            timestamp: new Date().toISOString()
+          }));
+          
+          await gatewayClient.sendChatMessage(sessionKey, message.content, ws);
+        } catch (error) {
+          console.error('[Chat] Error sending to gateway:', error);
+          ws.send(JSON.stringify({
+            type: 'error',
+            content: 'Sorry, I could not process your message. Please try again.',
+            timestamp: new Date().toISOString()
+          }));
+        }
+      } else if (message.type === 'command') {
+        // Handle web app commands
+        handleChatCommand(ws, message, sessionKey);
+      }
+    } catch (error) {
+      console.error('[Chat] Error handling message:', error);
+    }
+  });
+  
+  // Handle client disconnect
+  ws.on('close', () => {
+    console.log(`[Chat] Client disconnected - Session: ${sessionKey}`);
+    gatewayClient.unregisterClient(sessionKey, ws);
+  });
+  
+  // Handle errors
+  ws.on('error', (error) => {
+    console.error('[Chat] WebSocket error:', error);
+  });
+});
+
+/**
+ * Handle chat commands from web app
+ */
+async function handleChatCommand(ws, message, sessionKey) {
+  const { command, data } = message;
+  
+  try {
+    switch (command) {
+      case 'get_history':
+        const history = await gatewayClient.getChatHistory(sessionKey, data?.limit || 50);
+        ws.send(JSON.stringify({
+          type: 'history',
+          messages: history.messages || [],
+          timestamp: new Date().toISOString()
+        }));
+        break;
+        
+      case 'clear_chat':
+        // Just acknowledge - session storage will clear on browser close
+        ws.send(JSON.stringify({
+          type: 'system',
+          content: 'Chat history cleared for this session.',
+          timestamp: new Date().toISOString()
+        }));
+        break;
+        
+      default:
+        ws.send(JSON.stringify({
+          type: 'error',
+          content: `Unknown command: ${command}`,
+          timestamp: new Date().toISOString()
+        }));
+    }
+  } catch (error) {
+    console.error('[Chat] Command error:', error);
+    ws.send(JSON.stringify({
+      type: 'error',
+      content: 'Failed to execute command.',
+      timestamp: new Date().toISOString()
+    }));
+  }
+}
+
+// ============================================================================
+// START SERVER
+// ============================================================================
+
 ensureDataFile().then(() => {
   // Run cleanup on startup
   cleanupOldLogs().then(() => {
     console.log('Activity logs cleanup completed');
   });
   
-  app.listen(PORT, () => {
+  // Connect to OpenClaw gateway
+  gatewayClient.connect().then(() => {
+    console.log('[Gateway] Connected to OpenClaw');
+  }).catch(err => {
+    console.error('[Gateway] Failed to connect:', err.message);
+    console.log('[Gateway] Will retry on first chat message');
+  });
+  
+  server.listen(PORT, () => {
     console.log(`Cashflow API running on http://localhost:${PORT}`);
+    console.log(`WebSocket chat available at ws://localhost:${PORT}/api/chat`);
     console.log(`Activity logging enabled`);
   });
 }).catch(err => {
   console.error('Failed to initialize data file:', err);
   process.exit(1);
+});
+
+// Graceful shutdown
+process.on('SIGTERM', () => {
+  console.log('SIGTERM received, closing connections...');
+  gatewayClient.disconnect();
+  server.close(() => {
+    console.log('Server closed');
+    process.exit(0);
+  });
+});
+
+process.on('SIGINT', () => {
+  console.log('SIGINT received, closing connections...');
+  gatewayClient.disconnect();
+  server.close(() => {
+    console.log('Server closed');
+    process.exit(0);
+  });
 });

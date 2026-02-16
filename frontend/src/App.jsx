@@ -5,6 +5,7 @@ import SummaryCards from './components/SummaryCards';
 import FilterBar from './components/FilterBar';
 import CashflowTable from './components/CashflowTable';
 import ActivityManager from './components/ActivityManager';
+import ChatWidget from './components/ChatWidget';
 import { cashflowAPI } from './api/cashflow';
 
 export default function App() {
@@ -121,6 +122,9 @@ export default function App() {
           </div>
         </div>
       </div>
+      
+      {/* Global Chat Widget - available on all pages */}
+      {isAuthenticated && <ChatWidget />}
     </div>
   );
 }
