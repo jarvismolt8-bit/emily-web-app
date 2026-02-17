@@ -57,74 +57,87 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-950 py-4 md:py-8">
-      <div className="container mx-auto px-2 md:px-4">
-        {/* Main outlined wrapper */}
-        <div className="border border-slate-700 bg-gray-900">
-          {/* Header section */}
-          <div className="border-b border-slate-700 p-4 md:p-6">
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-              <div>
-                <h1 className="text-xl md:text-3xl font-bold text-white tracking-wide">🥖 Emily's web app</h1>
-                <p className="text-slate-400 mt-1 text-sm md:text-base">Manage your cashflow and activities</p>
+    <div className="min-h-screen bg-gray-950">
+      {/* Full width container - no max-width, no borders */}
+      <div className="w-full">
+        {/* Main wrapper - no border */}
+        <div className="bg-gray-900">
+          {/* Main Content Area - Row 2 with Two Columns */}
+          <div className="flex flex-col lg:flex-row">
+            {/* Left Column - Tabs & Content (3/4 width on desktop) - scrollable */}
+            <div className="w-full lg:w-3/4">
+              {/* Header section - Row 1 */}
+              <div className="border-b border-slate-700 p-4 md:p-6">
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                  <div>
+                    <h1 className="text-xl md:text-3xl font-bold text-white tracking-wide">🥖 Emily's web app</h1>
+                    <p className="text-slate-400 mt-1 text-sm md:text-base">Manage your cashflow and activities</p>
+                  </div>
+                  <button
+                    onClick={logout}
+                    className="border border-slate-600 hover:bg-slate-800 text-slate-300 px-3 py-1.5 md:px-4 md:py-2 transition-colors text-sm md:text-base w-full md:w-auto"
+                  >
+                    Logout
+                  </button>
+                </div>
               </div>
-              <button
-                onClick={logout}
-                className="border border-slate-600 hover:bg-slate-800 text-slate-300 px-3 py-1.5 md:px-4 md:py-2 transition-colors text-sm md:text-base w-full md:w-auto"
-              >
-                Logout
-              </button>
-            </div>
-          </div>
+              {/* Tab Navigation */}
+              <div className="border-b border-slate-700">
+                <div className="flex flex-col sm:flex-row">
+                  <button
+                    onClick={() => setActiveTab('cashflow')}
+                    className={`px-4 py-3 md:px-6 md:py-4 font-medium transition-colors border-b sm:border-b-0 sm:border-r border-slate-700 text-sm md:text-base ${
+                      activeTab === 'cashflow'
+                        ? 'text-white bg-slate-800'
+                        : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+                    }`}
+                  >
+                    Cashflow Manager
+                  </button>
+                  <button
+                    onClick={() => setActiveTab('activity')}
+                    className={`px-4 py-3 md:px-6 md:py-4 font-medium transition-colors text-sm md:text-base ${
+                      activeTab === 'activity'
+                        ? 'text-white bg-slate-800'
+                        : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+                    }`}
+                  >
+                    Activity Manager
+                  </button>
+                </div>
+              </div>
 
-          {/* Tab Navigation */}
-          <div className="border-b border-slate-700">
-            <div className="flex flex-col sm:flex-row">
-              <button
-                onClick={() => setActiveTab('cashflow')}
-                className={`px-4 py-3 md:px-6 md:py-4 font-medium transition-colors border-b sm:border-b-0 sm:border-r border-slate-700 text-sm md:text-base ${
-                  activeTab === 'cashflow'
-                    ? 'text-white bg-slate-800'
-                    : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
-                }`}
-              >
-                Cashflow Manager
-              </button>
-              <button
-                onClick={() => setActiveTab('activity')}
-                className={`px-4 py-3 md:px-6 md:py-4 font-medium transition-colors text-sm md:text-base ${
-                  activeTab === 'activity'
-                    ? 'text-white bg-slate-800'
-                    : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
-                }`}
-              >
-                Activity Manager
-              </button>
-            </div>
-          </div>
-
-          {/* Tab Content */}
-          <div className="p-3 md:p-6">
-            {activeTab === 'cashflow' ? (
-              <div>
-                <SummaryCards summary={summary} />
-                <div className="border-t border-slate-700 my-4 md:my-6"></div>
-                <FilterBar onFilterChange={handleFilterChange} />
-                {loading ? (
-                  <div className="text-center text-slate-400 py-8">Loading...</div>
+              {/* Tab Content */}
+              <div className="p-3 md:p-6">
+                {activeTab === 'cashflow' ? (
+                  <div>
+                    <SummaryCards summary={summary} />
+                    <div className="border-t border-slate-700 my-4 md:my-6"></div>
+                    <FilterBar onFilterChange={handleFilterChange} />
+                    {loading ? (
+                      <div className="text-center text-slate-400 py-8">Loading...</div>
+                    ) : (
+                      <CashflowTable entries={entries} onDelete={handleDelete} />
+                    )}
+                  </div>
                 ) : (
-                  <CashflowTable entries={entries} onDelete={handleDelete} />
+                  <ActivityManager />
                 )}
               </div>
-            ) : (
-              <ActivityManager />
-            )}
+            </div>
+            
+            {/* Right Column - Chat Widget (1/4 width on desktop) - sticky/persistent */}
+            <div className="hidden lg:block lg:w-1/4 lg:border-l lg:border-slate-700 lg:sticky lg:top-0 lg:h-screen">
+              {isAuthenticated && <ChatWidget desktopMode={true} />}
+            </div>
           </div>
         </div>
       </div>
       
-      {/* Global Chat Widget - available on all pages */}
-      {isAuthenticated && <ChatWidget />}
+      {/* Mobile Floating Chat - Hidden on desktop */}
+      <div className="lg:hidden">
+        {isAuthenticated && <ChatWidget desktopMode={false} />}
+      </div>
     </div>
   );
 }

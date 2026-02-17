@@ -5,10 +5,13 @@ import '../styles/chat.css';
 
 /**
  * ChatWidget Component
- * Floating chat interface for Emily (lower right corner)
- * Supports both desktop and mobile layouts
+ * 
+ * Desktop Mode: Side-by-side layout (always visible, no floating button)
+ * Mobile Mode: Floating button in lower right corner
+ * 
+ * @param {boolean} desktopMode - When true, renders as sidebar; when false, as floating widget
  */
-function ChatWidget() {
+function ChatWidget({ desktopMode = false }) {
   const {
     messages,
     isConnected,
@@ -21,7 +24,8 @@ function ChatWidget() {
     toggleExpanded,
     setIsExpanded,
     setPassword,
-    hasPassword
+    hasPassword,
+    fetchHistory
   } = useChat('web-user');
 
   const [inputValue, setInputValue] = useState('');
@@ -46,21 +50,21 @@ function ChatWidget() {
 
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
-    if (isExpanded && messagesEndRef.current) {
+    if ((desktopMode || isExpanded) && messagesEndRef.current) {
       messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
-  }, [messages, isTyping, isExpanded]);
+  }, [messages, isTyping, isExpanded, desktopMode]);
 
-  // Focus input when expanded
+  // Focus input when expanded or in desktop mode
   useEffect(() => {
-    if (isExpanded) {
+    if (desktopMode || isExpanded) {
       if (needsPassword && passwordInputRef.current) {
         setTimeout(() => passwordInputRef.current?.focus(), 100);
       } else if (inputRef.current) {
         setTimeout(() => inputRef.current?.focus(), 100);
       }
     }
-  }, [isExpanded, needsPassword]);
+  }, [isExpanded, needsPassword, desktopMode]);
 
   // Handle password submission
   const handlePasswordSubmit = (e) => {
@@ -138,6 +142,170 @@ function ChatWidget() {
     setIsExpanded(false);
   };
 
+  // DESKTOP MODE: Always expanded sidebar
+  if (desktopMode) {
+    return (
+      <div className="chat-widget-desktop">
+        {needsPassword ? (
+          // Desktop: Password input screen
+          <div className="chat-window-desktop">
+            {/* Header */}
+            <div className="chat-header-desktop">
+              <div className="chat-header-title">
+                <div className="chat-header-avatar">🥖</div>
+                <div>
+                  <div>Emily</div>
+                  <div className="chat-status">
+                    <span className="chat-status-dot disconnected"></span>
+                    <span>Password Required</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Password Input */}
+            <div className="chat-messages-desktop">
+              <div className="chat-token-required">
+                <div className="chat-token-icon">🔐</div>
+                <h3>Password Required</h3>
+                <p>To chat with Emily, you need to enter your web app password.</p>
+                <p className="chat-token-hint">
+                  Default password: <code>10716255</code>
+                </p>
+                <form onSubmit={handlePasswordSubmit} className="chat-token-form">
+                  <input
+                    ref={passwordInputRef}
+                    type="password"
+                    className="chat-token-input"
+                    placeholder="Enter your password..."
+                    value={passwordInput}
+                    onChange={(e) => setPasswordInput(e.target.value)}
+                    onKeyDown={handlePasswordKeyDown}
+                  />
+                  <button
+                    type="submit"
+                    className="chat-token-submit"
+                    disabled={!passwordInput.trim()}
+                  >
+                    Connect
+                  </button>
+                </form>
+              </div>
+            </div>
+          </div>
+        ) : (
+          // Desktop: Full chat interface
+          <div className="chat-window-desktop">
+            {/* Header */}
+            <div className="chat-header-desktop">
+              <div className="chat-header-title">
+                <div className="chat-header-avatar">🥖</div>
+                <div>
+                  <div>Emily</div>
+                  <div className="chat-status">
+                    <span className={`chat-status-dot ${isConnected ? '' : 'disconnected'}`}></span>
+                    <span>{isConnected ? 'Online' : 'Connecting...'}</span>
+                  </div>
+                </div>
+              </div>
+              <div className="chat-header-actions">
+                <button
+                  className="chat-header-btn"
+                  onClick={fetchHistory}
+                  title="Sync messages"
+                  aria-label="Sync messages"
+                >
+                  🔄
+                </button>
+                <button
+                  className="chat-header-btn"
+                  onClick={handleClearChat}
+                  title="Clear chat"
+                  aria-label="Clear chat"
+                >
+                  🗑️
+                </button>
+              </div>
+            </div>
+
+            {/* Messages */}
+            <div className="chat-messages-desktop">
+              {messages.length === 0 && (
+                <div className="chat-message chat-message-system">
+                  Start a conversation with Emily! You can ask me to:
+                  <br />• Add expenses or income
+                  <br />• Manage your tasks
+                  <br />• Check your summary
+                  <br />• And much more!
+                </div>
+              )}
+              
+              {messages.map((message, index) => (
+                <ChatMessage key={index} message={message} />
+              ))}
+              
+              {isTyping && (
+                <div className="chat-typing">
+                  <div className="chat-typing-dot"></div>
+                  <div className="chat-typing-dot"></div>
+                  <div className="chat-typing-dot"></div>
+                </div>
+              )}
+              
+              <div ref={messagesEndRef} />
+            </div>
+
+            {/* Quick Actions */}
+            <div className="chat-quick-actions-desktop">
+              {quickActions.map((action, index) => (
+                <button
+                  key={index}
+                  className="chat-quick-action-btn"
+                  onClick={action.action}
+                  disabled={!isConnected}
+                >
+                  {action.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Input Area */}
+            <div className="chat-input-area-desktop">
+              <textarea
+                ref={(el) => {
+                  textareaRef.current = el;
+                  inputRef.current = el;
+                }}
+                className="chat-input"
+                placeholder={isConnected ? "Type a message..." : "Connecting..."}
+                value={inputValue}
+                onChange={(e) => setInputValue(e.target.value)}
+                onKeyDown={handleKeyDown}
+                onInput={handleInput}
+                rows={1}
+                disabled={!isConnected}
+              />
+              <button
+                type="button"
+                className="chat-send-btn"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  handleSend();
+                }}
+                disabled={!inputValue.trim() || !isConnected}
+                aria-label="Send message"
+              >
+                🚀
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // MOBILE MODE: Floating button (original behavior)
   // Render collapsed button
   if (!isExpanded) {
     return (
@@ -233,6 +401,14 @@ function ChatWidget() {
             </div>
           </div>
           <div className="chat-header-actions">
+            <button
+              className="chat-header-btn"
+              onClick={fetchHistory}
+              title="Sync messages"
+              aria-label="Sync messages"
+            >
+              🔄
+            </button>
             <button
               className="chat-header-btn"
               onClick={handleClearChat}

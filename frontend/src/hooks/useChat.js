@@ -280,6 +280,22 @@ export function useChat(userId = 'web-user') {
         setIsTyping(false);
         break;
         
+      case 'history':
+        // Replace local messages with history from gateway
+        if (message.messages && message.messages.length > 0) {
+          // Convert gateway format to our format
+          const formattedMessages = message.messages.map(msg => ({
+            type: 'message',
+            sender: msg.role === 'assistant' ? 'emily' : 'user',
+            content: typeof msg.content === 'string' ? msg.content : 
+                     (Array.isArray(msg.content) ? msg.content.map(c => c.text).join('') : '') || '',
+            timestamp: msg.timestamp || new Date().toISOString()
+          }));
+          
+          setMessages(formattedMessages);
+        }
+        break;
+        
       default:
         console.log('[Chat] Unknown message type:', message.type);
     }
@@ -346,6 +362,22 @@ export function useChat(userId = 'web-user') {
     broadcast('clear', {});
   }, [broadcast]);
 
+  // Fetch chat history from gateway
+  const fetchHistory = useCallback(() => {
+    if (!isConnected || !wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
+      console.log('[Chat] Cannot fetch history - not connected');
+      return false;
+    }
+
+    console.log('[Chat] Fetching history...');
+    wsRef.current.send(JSON.stringify({
+      type: 'command',
+      command: 'get_history',
+      data: { limit: 50 }
+    }));
+    return true;
+  }, [isConnected]);
+
   // Toggle expanded state
   const toggleExpanded = useCallback(() => {
     setIsExpanded(prev => {
@@ -373,6 +405,29 @@ export function useChat(userId = 'web-user') {
     };
   }, []);
 
+  // Fetch history when connected
+  useEffect(() => {
+    if (isConnected) {
+      // Small delay to ensure WebSocket is fully ready
+      const timeoutId = setTimeout(() => {
+        fetchHistory();
+      }, 500);
+      return () => clearTimeout(timeoutId);
+    }
+  }, [isConnected, fetchHistory]);
+
+  // Auto-refresh history every 2 minutes while chat is open
+  useEffect(() => {
+    if (!isConnected || !isExpanded) return;
+    
+    const intervalId = setInterval(() => {
+      console.log('[Chat] Auto-refreshing history...');
+      fetchHistory();
+    }, 120000); // 2 minutes
+    
+    return () => clearInterval(intervalId);
+  }, [isConnected, isExpanded, fetchHistory]);
+
   return {
     messages,
     isConnected,
@@ -385,6 +440,7 @@ export function useChat(userId = 'web-user') {
     toggleExpanded,
     setIsExpanded,
     setPassword,
-    hasPassword
+    hasPassword,
+    fetchHistory
   };
 }
