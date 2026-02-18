@@ -4,14 +4,22 @@ const fs = require('fs').promises;
 const path = require('path');
 const http = require('http');
 const WebSocket = require('ws');
+const swaggerUi = require('swagger-ui-express');
+const YAML = require('yamljs');
 require('dotenv').config();
+
+const swaggerDocument = YAML.load(path.join(__dirname, 'swagger.yaml'));
 
 // Import chokidar for file watching
 const chokidar = require('chokidar');
 
 // Import gateway client
 const gatewayClient = require('./gateway-client');
-const commandHandler = require('./chat-commands');
+
+const sourceMiddleware = require('./middleware/source');
+const cashflowV1Routes = require('./routes/v1/cashflow');
+const tasksV1Routes = require('./routes/v1/tasks');
+const activityLogsV1Routes = require('./routes/v1/activity-logs');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -25,6 +33,11 @@ let isManualWebAppChange = false;
 
 app.use(cors());
 app.use(express.json());
+
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument, {
+  customCss: '.swagger-ui .topbar { display: none }',
+  customSiteTitle: 'Cashflow Manager API Docs'
+}));
 
 // Middleware to track manual web app changes
 app.use((req, res, next) => {
@@ -48,6 +61,13 @@ const verifyPassword = (req, res, next) => {
     res.status(401).json({ error: 'Unauthorized' });
   }
 };
+
+// ============================================================================
+// V1 API ROUTES (NEW)
+// ============================================================================
+app.use('/api/v1/cashflow', verifyPassword, sourceMiddleware, cashflowV1Routes);
+app.use('/api/v1/tasks', verifyPassword, sourceMiddleware, tasksV1Routes);
+app.use('/api/v1/activity-logs', verifyPassword, sourceMiddleware, activityLogsV1Routes);
 
 // Ensure data file exists
 async function ensureDataFile() {
@@ -592,6 +612,22 @@ app.post('/api/emily/tasks/delete-by-name', verifyPassword, async (req, res) => 
     });
   }
 });
+
+// ============================================================================
+// LEGACY API ENDPOINTS (DEPRECATED - use /api/v1/ instead)
+// These routes will be removed in a future version
+// ============================================================================
+
+const deprecationWarning = (req, res, next) => {
+  console.log(`[DEPRECATED] ${req.method} ${req.path} - Use /api/v1${req.path.replace('/api', '')} instead`);
+  next();
+};
+
+app.use('/api/cashflow', deprecationWarning);
+app.use('/api/tasks', deprecationWarning);
+app.use('/api/emily', deprecationWarning);
+app.use('/api/activity-logs', deprecationWarning);
+app.use('/api/summary', deprecationWarning);
 
 // ============================================================================
 // EXISTING API ENDPOINTS
@@ -1224,9 +1260,6 @@ wss.on('connection', (ws, req) => {
         };
         
         gatewayClient.broadcastToSession(sessionKey, userMessage);
-        
-        // Check if it's a command
-        const parsedCommand = commandHandler.parseCommand(message.content);
         
         // Forward all messages to Emily - let her handle all responses
         // (Local command handler disabled to prevent duplicate responses)

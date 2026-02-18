@@ -22,6 +22,9 @@ interface TaskFormData {
   priority: string
 }
 
+type SortField = 'id' | 'date' | 'priority'
+type SortOrder = 'asc' | 'desc'
+
 interface TasksProps {
   showAddButton?: boolean
 }
@@ -31,11 +34,13 @@ export default function Tasks({ showAddButton = true }: TasksProps) {
   const [loading, setLoading] = useState(false)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingTask, setEditingTask] = useState<Task | null>(null)
+  const [sortBy, setSortBy] = useState<SortField | null>(null)
+  const [sortOrder, setSortOrder] = useState<SortOrder>('desc')
 
   const fetchTasks = async () => {
     setLoading(true)
     try {
-      const data = await tasksAPI.getAll()
+      const data = await tasksAPI.getAll(sortBy ? { sortBy, sortOrder } : undefined)
       setTasks(data)
     } catch (error) {
       console.error('Error fetching tasks:', error)
@@ -45,7 +50,20 @@ export default function Tasks({ showAddButton = true }: TasksProps) {
 
   useEffect(() => {
     fetchTasks()
-  }, [])
+  }, [sortBy, sortOrder])
+
+  const handleSort = (field: SortField) => {
+    if (sortBy === field) {
+      if (sortOrder === 'asc') {
+        setSortOrder('desc')
+      } else {
+        setSortBy(null)
+      }
+    } else {
+      setSortBy(field)
+      setSortOrder('asc')
+    }
+  }
 
   const handleAdd = () => {
     setEditingTask(null)
@@ -100,7 +118,7 @@ export default function Tasks({ showAddButton = true }: TasksProps) {
       {loading ? (
         <div className="flex items-center justify-center py-12 text-muted-foreground">Loading...</div>
       ) : (
-        <TaskTable tasks={tasks} onEdit={handleEdit} onDelete={handleDelete} />
+        <TaskTable tasks={tasks} onEdit={handleEdit} onDelete={handleDelete} sortBy={sortBy} sortOrder={sortOrder} onSort={handleSort} />
       )}
 
       <TaskModal

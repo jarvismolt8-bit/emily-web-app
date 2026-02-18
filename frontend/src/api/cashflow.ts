@@ -1,9 +1,32 @@
-const API_BASE = import.meta.env.VITE_API_URL || '/api'
+const API_BASE = import.meta.env.VITE_API_URL || '/api/v1'
+
+interface ApiEnvelope<T> {
+  success: boolean
+  data: T
+  message?: string
+  error?: { code: string; message: string }
+}
+
+async function unwrapResponse<T>(response: Response): Promise<T> {
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}))
+    throw new Error(errorData.error?.message || `HTTP ${response.status}`)
+  }
+  const envelope: ApiEnvelope<T> = await response.json()
+  if (!envelope.success) {
+    throw new Error(envelope.error?.message || 'Request failed')
+  }
+  return envelope.data
+}
 
 interface CashflowFilters {
   category?: string
   currency?: string
   search?: string
+  startDate?: string
+  endDate?: string
+  sortBy?: 'date' | 'category' | 'amount'
+  sortOrder?: 'asc' | 'desc'
 }
 
 interface CashflowEntry {
@@ -24,55 +47,58 @@ interface Summary {
   transactionCount: number
 }
 
+const headers = () => ({
+  'Content-Type': 'application/json',
+  'X-Password': import.meta.env.VITE_PASSWORD,
+  'X-Source': 'web_app'
+})
+
 export const cashflowAPI = {
   getAll: async (params: CashflowFilters = {}): Promise<CashflowEntry[]> => {
     const queryString = new URLSearchParams(params as Record<string, string>).toString()
     const response = await fetch(`${API_BASE}/cashflow${queryString ? '?' + queryString : ''}`, {
-      headers: { 'X-Password': import.meta.env.VITE_PASSWORD }
+      headers: headers()
     })
-    if (!response.ok) throw new Error('Failed to fetch entries')
-    return response.json()
+    return unwrapResponse<CashflowEntry[]>(response)
+  },
+
+  getById: async (id: string): Promise<CashflowEntry> => {
+    const response = await fetch(`${API_BASE}/cashflow/${id}`, {
+      headers: headers()
+    })
+    return unwrapResponse<CashflowEntry>(response)
   },
 
   getSummary: async (): Promise<Summary> => {
-    const response = await fetch(`${API_BASE}/summary`, {
-      headers: { 'X-Password': import.meta.env.VITE_PASSWORD }
+    const response = await fetch(`${API_BASE}/cashflow/summary`, {
+      headers: headers()
     })
-    if (!response.ok) throw new Error('Failed to fetch summary')
-    return response.json()
+    return unwrapResponse<Summary>(response)
   },
 
   add: async (entry: Partial<CashflowEntry>): Promise<CashflowEntry> => {
     const response = await fetch(`${API_BASE}/cashflow`, {
       method: 'POST',
-      headers: { 
-        'Content-Type': 'application/json',
-        'X-Password': import.meta.env.VITE_PASSWORD
-      },
+      headers: headers(),
       body: JSON.stringify(entry)
     })
-    if (!response.ok) throw new Error('Failed to add entry')
-    return response.json()
+    return unwrapResponse<CashflowEntry>(response)
   },
 
   update: async (id: string, entry: Partial<CashflowEntry>): Promise<CashflowEntry> => {
     const response = await fetch(`${API_BASE}/cashflow/${id}`, {
       method: 'PUT',
-      headers: { 
-        'Content-Type': 'application/json',
-        'X-Password': import.meta.env.VITE_PASSWORD
-      },
+      headers: headers(),
       body: JSON.stringify(entry)
     })
-    if (!response.ok) throw new Error('Failed to update entry')
-    return response.json()
+    return unwrapResponse<CashflowEntry>(response)
   },
 
   delete: async (id: string): Promise<void> => {
     const response = await fetch(`${API_BASE}/cashflow/${id}`, {
       method: 'DELETE',
-      headers: { 'X-Password': import.meta.env.VITE_PASSWORD }
+      headers: headers()
     })
-    if (!response.ok) throw new Error('Failed to delete entry')
+    await unwrapResponse<{ id: string }>(response)
   }
 }

@@ -31,23 +31,42 @@ interface Task {
   priority: string
 }
 
+type SortField = 'id' | 'date' | 'priority'
+type SortOrder = 'asc' | 'desc'
+
 interface TaskTableProps {
   tasks: Task[]
   onEdit: (task: Task) => void
   onDelete: (id: string) => void
+  sortBy?: SortField | null
+  sortOrder?: SortOrder
+  onSort?: (field: SortField) => void
 }
 
-export default function TaskTable({ tasks, onEdit, onDelete }: TaskTableProps) {
+function SortIndicator({ field, currentField, currentOrder }: { field: SortField; currentField?: SortField | null; currentOrder?: SortOrder }) {
+  if (currentField !== field) {
+    return <span className="ml-1 text-muted-foreground/50">▼</span>
+  }
+  return <span className="ml-1">{currentOrder === 'asc' ? '▲' : '▼'}</span>
+}
+
+export default function TaskTable({ tasks, onEdit, onDelete, sortBy, sortOrder, onSort }: TaskTableProps) {
   return (
     <div className="overflow-x-auto rounded-lg border">
       <Table>
         <TableHeader>
           <TableRow className="hover:bg-transparent">
-            <TableHead className="h-11 w-[60px]">ID</TableHead>
+            <TableHead className="h-11 w-[60px] cursor-pointer select-none hover:text-foreground" onClick={() => onSort?.('id')}>
+              ID<SortIndicator field="id" currentField={sortBy} currentOrder={sortOrder} />
+            </TableHead>
             <TableHead>Task</TableHead>
-            <TableHead>Due</TableHead>
+            <TableHead className="cursor-pointer select-none hover:text-foreground" onClick={() => onSort?.('date')}>
+              Due<SortIndicator field="date" currentField={sortBy} currentOrder={sortOrder} />
+            </TableHead>
             <TableHead>Status</TableHead>
-            <TableHead>Priority</TableHead>
+            <TableHead className="cursor-pointer select-none hover:text-foreground" onClick={() => onSort?.('priority')}>
+              Priority<SortIndicator field="priority" currentField={sortBy} currentOrder={sortOrder} />
+            </TableHead>
             <TableHead className="w-[50px]"></TableHead>
           </TableRow>
         </TableHeader>

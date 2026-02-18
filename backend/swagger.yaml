@@ -1,0 +1,1303 @@
+openapi: 3.0.3
+info:
+  title: Cashflow Manager API
+  description: |
+    API for managing personal cashflow transactions, tasks, and activity logs.
+    Powers both the web application and Emily (OpenClaw AI agent).
+    
+    ## Versioning
+    - **v1** (`/api/v1/`) - Current version with standardized response envelope
+    - **Legacy** (`/api/`) - Deprecated, will be removed in future version
+    
+    ## Response Format (v1)
+    All v1 endpoints return a standardized envelope:
+    ```json
+    { "success": true, "data": { ... }, "message": "optional" }
+    { "success": false, "error": { "code": "...", "message": "..." } }
+    ```
+  version: 1.1.0
+  contact:
+    name: Kevin
+    email: support@example.com
+
+servers:
+  - url: http://localhost:3001
+    description: Local development server
+  - url: https://cashflow.example.com
+    description: Production server
+
+tags:
+  - name: v1 Cashflow
+    description: Financial transaction management (v1)
+  - name: v1 Tasks
+    description: Task management (v1)
+  - name: v1 Activity Logs
+    description: Activity logging and statistics (v1)
+  - name: Cashflow (Legacy)
+    description: Deprecated - use v1 endpoints
+  - name: Tasks (Legacy)
+    description: Deprecated - use v1 endpoints
+  - name: Emily Tasks (Legacy)
+    description: Deprecated - use v1 tasks endpoints
+  - name: Activity Logs (Legacy)
+    description: Deprecated - use v1 endpoints
+  - name: Chat
+    description: Real-time WebSocket chat
+
+security:
+  - PasswordAuth: []
+
+components:
+  securitySchemes:
+    PasswordAuth:
+      type: apiKey
+      in: header
+      name: X-Password
+      description: Shared password for API access
+
+  schemas:
+    CashflowTransaction:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Unique identifier (timestamp-based)
+          example: "1708300000000"
+        item:
+          type: string
+          description: Transaction item/description
+          example: "Grocery shopping"
+        amount:
+          type: number
+          description: Amount (positive = income, negative = expense)
+          example: -1500.50
+        currency:
+          type: string
+          enum: [PHP, USD, EUR, GBP]
+          default: PHP
+          example: PHP
+        date:
+          type: string
+          format: date
+          example: "2026-02-18"
+        time:
+          type: string
+          pattern: '^\d{2}:\d{2}$'
+          example: "14:30"
+        timezone:
+          type: string
+          default: PHT
+          example: PHT
+        category:
+          type: string
+          enum: [Income, Food, Transport, Utilities, Shopping, Entertainment, Health, Airbnb, Other]
+          example: Food
+        notes:
+          type: string
+          example: "Weekly groceries"
+        source:
+          type: string
+          enum: [web_app, telegram, system]
+          description: Source of the transaction (for logging)
+          default: web_app
+
+    CashflowSummary:
+      type: object
+      properties:
+        totalIncome:
+          type: number
+          example: 50000
+        totalExpenses:
+          type: number
+          example: 35000
+        balance:
+          type: number
+          example: 15000
+        transactionCount:
+          type: integer
+          example: 42
+
+    Task:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Zero-padded sequential ID
+          example: "001"
+        name:
+          type: string
+          example: "Review quarterly report"
+        date:
+          type: string
+          example: "2026-02-18"
+        time:
+          type: string
+          example: "10:00"
+        status:
+          type: string
+          enum: [active, done]
+          default: active
+        priority:
+          type: string
+          enum: [low, medium, high]
+          default: medium
+
+    EmilyTaskResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        task:
+          $ref: '#/components/schemas/Task'
+        activity_logged:
+          type: boolean
+        error:
+          type: string
+          nullable: true
+
+    ActivityLog:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Timestamp-based ID
+          example: "1708300000000"
+        timestamp:
+          type: string
+          format: date-time
+          example: "2026-02-18T06:30:00.000Z"
+        date:
+          type: string
+          description: Human-readable date (PHT)
+          example: "Feb 18 2026"
+        time:
+          type: string
+          description: Human-readable time (PHT)
+          example: "2:30pm"
+        timezone:
+          type: string
+          example: PHT
+        actor:
+          type: string
+          example: "Emily"
+        source:
+          type: string
+          enum: [telegram, web_app, system]
+          example: telegram
+        action_type:
+          type: string
+          enum: [task_create, task_update, task_delete, cashflow_add, cashflow_update, cashflow_delete]
+          example: task_create
+        description:
+          type: string
+          example: "Added task: Review quarterly report"
+        details:
+          type: object
+          additionalProperties: true
+        status:
+          type: string
+          enum: [success, failed]
+          example: success
+        error_message:
+          type: string
+          nullable: true
+
+    ActivityLogStats:
+      type: object
+      properties:
+        total_logs:
+          type: integer
+          example: 150
+        success_count:
+          type: integer
+          example: 145
+        failed_count:
+          type: integer
+          example: 5
+        action_types:
+          type: object
+          additionalProperties:
+            type: integer
+          example:
+            task_create: 50
+            task_update: 30
+            cashflow_add: 40
+        sources:
+          type: object
+          additionalProperties:
+            type: integer
+          example:
+            telegram: 60
+            web_app: 90
+        last_cleanup:
+          type: string
+          format: date-time
+          nullable: true
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+          example: "Entry not found"
+
+    ChatMessage:
+      type: object
+      properties:
+        type:
+          type: string
+          enum: [message, command, typing, system, error]
+        sender:
+          type: string
+          enum: [user, emily]
+        content:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+
+    V1SuccessEnvelope:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+        message:
+          type: string
+          nullable: true
+
+    V1ErrorEnvelope:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+            message:
+              type: string
+
+paths:
+  /api/v1/cashflow:
+    get:
+      tags: [v1 Cashflow]
+      summary: List all cashflow transactions (v1)
+      parameters:
+        - name: category
+          in: query
+          schema:
+            type: string
+        - name: currency
+          in: query
+          schema:
+            type: string
+        - name: startDate
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: endDate
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: search
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of transactions
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/V1SuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/CashflowTransaction'
+        '401':
+          description: Unauthorized
+    post:
+      tags: [v1 Cashflow]
+      summary: Create a new transaction (v1)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [item, amount, date]
+              properties:
+                item:
+                  type: string
+                amount:
+                  type: number
+                currency:
+                  type: string
+                  default: PHP
+                date:
+                  type: string
+                time:
+                  type: string
+                category:
+                  type: string
+                notes:
+                  type: string
+      responses:
+        '201':
+          description: Transaction created
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/V1SuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/CashflowTransaction'
+
+  /api/v1/cashflow/summary:
+    get:
+      tags: [v1 Cashflow]
+      summary: Get financial summary (v1)
+      responses:
+        '200':
+          description: Financial summary
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/V1SuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/CashflowSummary'
+
+  /api/v1/cashflow/{id}:
+    get:
+      tags: [v1 Cashflow]
+      summary: Get single transaction (v1)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Transaction details
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/V1SuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/CashflowTransaction'
+    put:
+      tags: [v1 Cashflow]
+      summary: Update a transaction (v1)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: Transaction updated
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/V1SuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/CashflowTransaction'
+    delete:
+      tags: [v1 Cashflow]
+      summary: Delete a transaction (v1)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Transaction deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/V1SuccessEnvelope'
+
+  /api/v1/tasks:
+    get:
+      tags: [v1 Tasks]
+      summary: List all tasks (v1)
+      responses:
+        '200':
+          description: List of tasks
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/V1SuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Task'
+    post:
+      tags: [v1 Tasks]
+      summary: Create a new task (v1)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name:
+                  type: string
+                date:
+                  type: string
+                time:
+                  type: string
+                status:
+                  type: string
+                  enum: [active, done]
+                priority:
+                  type: string
+                  enum: [low, medium, high]
+      responses:
+        '201':
+          description: Task created
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/V1SuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/Task'
+    delete:
+      tags: [v1 Tasks]
+      summary: Delete task by name (v1)
+      parameters:
+        - name: name
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Task deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/V1SuccessEnvelope'
+
+  /api/v1/tasks/{id}:
+    get:
+      tags: [v1 Tasks]
+      summary: Get single task (v1)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Task details
+    put:
+      tags: [v1 Tasks]
+      summary: Update a task (v1)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: Task updated
+    delete:
+      tags: [v1 Tasks]
+      summary: Delete a task (v1)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Task deleted
+
+  /api/v1/activity-logs:
+    get:
+      tags: [v1 Activity Logs]
+      summary: List activity logs (v1)
+      parameters:
+        - name: search
+          in: query
+          schema:
+            type: string
+        - name: action_type
+          in: query
+          schema:
+            type: string
+        - name: status
+          in: query
+          schema:
+            type: string
+        - name: source
+          in: query
+          schema:
+            type: string
+        - name: date_from
+          in: query
+          schema:
+            type: string
+        - name: date_to
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of activity logs
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/V1SuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          logs:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/ActivityLog'
+                          total_count:
+                            type: integer
+                          last_cleanup:
+                            type: string
+    post:
+      tags: [v1 Activity Logs]
+      summary: Create a manual activity log (v1)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [action_type, description]
+              properties:
+                action_type:
+                  type: string
+                description:
+                  type: string
+                details:
+                  type: object
+                status:
+                  type: string
+                error_message:
+                  type: string
+                source:
+                  type: string
+                actor:
+                  type: string
+      responses:
+        '201':
+          description: Activity log created
+
+  /api/v1/activity-logs/stats:
+    get:
+      tags: [v1 Activity Logs]
+      summary: Get activity log statistics (v1)
+      responses:
+        '200':
+          description: Activity statistics
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/V1SuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/ActivityLogStats'
+
+  # ============================================================================
+  # LEGACY ENDPOINTS (DEPRECATED)
+  # ============================================================================
+  /api/cashflow:
+    get:
+      tags: [Cashflow (Legacy)]
+      deprecated: true
+      summary: "[DEPRECATED] List all cashflow transactions"
+      description: Returns filtered and sorted list of transactions
+      parameters:
+        - name: category
+          in: query
+          schema:
+            type: string
+            enum: [Income, Food, Transport, Utilities, Shopping, Entertainment, Health, Airbnb, Other, All]
+        - name: currency
+          in: query
+          schema:
+            type: string
+            enum: [PHP, USD, EUR, GBP, All]
+        - name: startDate
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: endDate
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: search
+          in: query
+          description: Search in item name and notes
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of transactions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/CashflowTransaction'
+        '401':
+          description: Unauthorized
+        '500':
+          description: Server error
+
+    post:
+      tags: [Cashflow]
+      summary: Create a new transaction
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [item, amount, date]
+              properties:
+                item:
+                  type: string
+                amount:
+                  type: number
+                currency:
+                  type: string
+                  default: PHP
+                date:
+                  type: string
+                  format: date
+                time:
+                  type: string
+                timezone:
+                  type: string
+                  default: PHT
+                category:
+                  type: string
+                  default: Other
+                notes:
+                  type: string
+                source:
+                  type: string
+                  default: web_app
+      responses:
+        '201':
+          description: Transaction created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CashflowTransaction'
+        '401':
+          description: Unauthorized
+        '500':
+          description: Server error
+
+  /api/cashflow/{id}:
+    put:
+      tags: [Cashflow]
+      summary: Update a transaction
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                item:
+                  type: string
+                amount:
+                  type: number
+                currency:
+                  type: string
+                date:
+                  type: string
+                time:
+                  type: string
+                category:
+                  type: string
+                notes:
+                  type: string
+                source:
+                  type: string
+      responses:
+        '200':
+          description: Transaction updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CashflowTransaction'
+        '401':
+          description: Unauthorized
+        '404':
+          description: Transaction not found
+        '500':
+          description: Server error
+
+    delete:
+      tags: [Cashflow]
+      summary: Delete a transaction
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: source
+          in: query
+          description: Source for activity logging
+          schema:
+            type: string
+            enum: [web_app, telegram, system]
+            default: web_app
+      responses:
+        '204':
+          description: Transaction deleted
+        '401':
+          description: Unauthorized
+        '404':
+          description: Transaction not found
+        '500':
+          description: Server error
+
+  /api/summary:
+    get:
+      tags: [Cashflow]
+      summary: Get financial summary
+      description: Returns total income, expenses, and balance
+      responses:
+        '200':
+          description: Financial summary
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CashflowSummary'
+        '401':
+          description: Unauthorized
+        '500':
+          description: Server error
+
+  /api/tasks:
+    get:
+      tags: [Tasks]
+      summary: List all tasks
+      responses:
+        '200':
+          description: List of tasks
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Task'
+        '401':
+          description: Unauthorized
+        '500':
+          description: Server error
+
+    post:
+      tags: [Tasks]
+      summary: Create a new task
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name:
+                  type: string
+                date:
+                  type: string
+                time:
+                  type: string
+                status:
+                  type: string
+                  enum: [active, done]
+                  default: active
+                priority:
+                  type: string
+                  enum: [low, medium, high]
+                  default: medium
+      responses:
+        '201':
+          description: Task created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Task'
+        '401':
+          description: Unauthorized
+        '500':
+          description: Server error
+
+  /api/tasks/{id}:
+    put:
+      tags: [Tasks]
+      summary: Update a task
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                date:
+                  type: string
+                time:
+                  type: string
+                status:
+                  type: string
+                  enum: [active, done]
+                priority:
+                  type: string
+                  enum: [low, medium, high]
+      responses:
+        '200':
+          description: Task updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Task'
+        '401':
+          description: Unauthorized
+        '404':
+          description: Task not found
+        '500':
+          description: Server error
+
+    delete:
+      tags: [Tasks]
+      summary: Delete a task
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Task deleted
+        '401':
+          description: Unauthorized
+        '404':
+          description: Task not found
+        '500':
+          description: Server error
+
+  /api/emily/tasks/create:
+    post:
+      tags: [Emily Tasks]
+      summary: Create a task (Emily)
+      description: Emily AI agent endpoint with automatic activity logging
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name:
+                  type: string
+                date:
+                  type: string
+                time:
+                  type: string
+                priority:
+                  type: string
+                  enum: [low, medium, high]
+                  default: medium
+                source:
+                  type: string
+                  default: telegram
+      responses:
+        '200':
+          description: Task created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmilyTaskResponse'
+        '400':
+          description: Missing required field
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmilyTaskResponse'
+        '401':
+          description: Unauthorized
+        '500':
+          description: Server error
+
+  /api/emily/tasks/update/{id}:
+    post:
+      tags: [Emily Tasks]
+      summary: Update a task (Emily)
+      description: Emily AI agent endpoint with automatic activity logging
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                date:
+                  type: string
+                time:
+                  type: string
+                priority:
+                  type: string
+                  enum: [low, medium, high]
+                source:
+                  type: string
+                  default: telegram
+      responses:
+        '200':
+          description: Task updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmilyTaskResponse'
+        '401':
+          description: Unauthorized
+        '404':
+          description: Task not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmilyTaskResponse'
+        '500':
+          description: Server error
+
+  /api/emily/tasks/delete/{id}:
+    post:
+      tags: [Emily Tasks]
+      summary: Delete a task by ID (Emily)
+      description: Emily AI agent endpoint with automatic activity logging
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                source:
+                  type: string
+                  default: telegram
+      responses:
+        '200':
+          description: Task deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  deleted_task_id:
+                    type: string
+                  deleted_task_name:
+                    type: string
+                  activity_logged:
+                    type: boolean
+        '401':
+          description: Unauthorized
+        '404':
+          description: Task not found
+        '500':
+          description: Server error
+
+  /api/emily/tasks/delete-by-name:
+    post:
+      tags: [Emily Tasks]
+      summary: Delete a task by name (Emily)
+      description: Emily AI agent endpoint with automatic activity logging
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [task_name]
+              properties:
+                task_name:
+                  type: string
+                source:
+                  type: string
+                  default: telegram
+      responses:
+        '200':
+          description: Task deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  deleted_task_id:
+                    type: string
+                  deleted_task_name:
+                    type: string
+                  activity_logged:
+                    type: boolean
+        '400':
+          description: Missing task_name
+        '401':
+          description: Unauthorized
+        '404':
+          description: Task not found
+        '500':
+          description: Server error
+
+  /api/activity-logs:
+    get:
+      tags: [Activity Logs]
+      summary: List activity logs
+      parameters:
+        - name: search
+          in: query
+          description: Search in description and details
+          schema:
+            type: string
+        - name: action_type
+          in: query
+          schema:
+            type: string
+            enum: [task_create, task_update, task_delete, cashflow_add, cashflow_update, cashflow_delete]
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [success, failed]
+        - name: source
+          in: query
+          schema:
+            type: string
+            enum: [telegram, web_app, system]
+        - name: date_from
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: date_to
+          in: query
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: List of activity logs
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  logs:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ActivityLog'
+                  total_count:
+                    type: integer
+                  last_cleanup:
+                    type: string
+                    format: date-time
+                    nullable: true
+        '401':
+          description: Unauthorized
+        '500':
+          description: Server error
+
+    post:
+      tags: [Activity Logs]
+      summary: Create a manual activity log
+      description: For Emily skills or external logging
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [action_type, description]
+              properties:
+                action_type:
+                  type: string
+                description:
+                  type: string
+                details:
+                  type: object
+                status:
+                  type: string
+                  enum: [success, failed]
+                  default: success
+                error_message:
+                  type: string
+                source:
+                  type: string
+                  enum: [telegram, web_app, system]
+                  default: telegram
+                actor:
+                  type: string
+                  default: Emily
+      responses:
+        '201':
+          description: Activity log created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ActivityLog'
+        '401':
+          description: Unauthorized
+        '500':
+          description: Server error
+
+  /api/activity-logs/stats:
+    get:
+      tags: [Activity Logs]
+      summary: Get activity log statistics
+      responses:
+        '200':
+          description: Activity statistics
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ActivityLogStats'
+        '401':
+          description: Unauthorized
+        '500':
+          description: Server error
+
+  /api/chat:
+    get:
+      tags: [Chat]
+      summary: WebSocket chat endpoint
+      description: |
+        WebSocket endpoint for real-time chat with Emily AI agent.
+        
+        **Connection:**
+        ```
+        ws://localhost:3001/api/chat?password=YOUR_PASSWORD&session=SESSION_ID&userId=USER_ID
+        ```
+        
+        **Message Types:**
+        
+        *Send message:*
+        ```json
+        { "type": "message", "content": "Hello Emily!" }
+        ```
+        
+        *Receive message:*
+        ```json
+        { "type": "message", "sender": "emily", "content": "Hi! How can I help?", "timestamp": "..." }
+        ```
+        
+        *Typing indicator:*
+        ```json
+        { "type": "typing", "sender": "emily", "timestamp": "..." }
+        ```
+      parameters:
+        - name: password
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: session
+          in: query
+          schema:
+            type: string
+        - name: userId
+          in: query
+          schema:
+            type: string
+            default: anonymous
+      responses:
+        '101':
+          description: Switching to WebSocket protocol
+        '401':
+          description: Unauthorized

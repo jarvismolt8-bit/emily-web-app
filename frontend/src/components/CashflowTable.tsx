@@ -38,21 +38,40 @@ interface CashflowEntry {
   amount: number
 }
 
+type SortField = 'date' | 'category' | 'amount'
+type SortOrder = 'asc' | 'desc'
+
 interface CashflowTableProps {
   entries: CashflowEntry[]
   onDelete: (id: string) => void
+  sortBy?: SortField | null
+  sortOrder?: SortOrder
+  onSort?: (field: SortField) => void
 }
 
-export default function CashflowTable({ entries, onDelete }: CashflowTableProps) {
+function SortIndicator({ field, currentField, currentOrder }: { field: SortField; currentField?: SortField | null; currentOrder?: SortOrder }) {
+  if (currentField !== field) {
+    return <span className="ml-1 text-muted-foreground/50">▼</span>
+  }
+  return <span className="ml-1">{currentOrder === 'asc' ? '▲' : '▼'}</span>
+}
+
+export default function CashflowTable({ entries, onDelete, sortBy, sortOrder, onSort }: CashflowTableProps) {
   return (
     <div className="overflow-x-auto rounded-lg border">
       <Table>
         <TableHeader>
           <TableRow className="hover:bg-transparent">
-            <TableHead className="h-11">Date</TableHead>
+            <TableHead className="h-11 cursor-pointer select-none hover:text-foreground" onClick={() => onSort?.('date')}>
+              Date<SortIndicator field="date" currentField={sortBy} currentOrder={sortOrder} />
+            </TableHead>
             <TableHead>Item</TableHead>
-            <TableHead>Category</TableHead>
-            <TableHead className="text-right">Amount</TableHead>
+            <TableHead className="cursor-pointer select-none hover:text-foreground" onClick={() => onSort?.('category')}>
+              Category<SortIndicator field="category" currentField={sortBy} currentOrder={sortOrder} />
+            </TableHead>
+            <TableHead className="text-right cursor-pointer select-none hover:text-foreground" onClick={() => onSort?.('amount')}>
+              Amount<SortIndicator field="amount" currentField={sortBy} currentOrder={sortOrder} />
+            </TableHead>
             <TableHead className="w-[50px]"></TableHead>
           </TableRow>
         </TableHeader>

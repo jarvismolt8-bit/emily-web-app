@@ -20,6 +20,9 @@ interface Filters {
   search: string
 }
 
+type CashflowSortField = 'date' | 'category' | 'amount'
+type SortOrder = 'asc' | 'desc'
+
 interface CashflowEntry {
   id: string
   date: string
@@ -44,13 +47,15 @@ export default function App() {
   const [entries, setEntries] = useState<CashflowEntry[]>([])
   const [summary, setSummary] = useState<Summary>({ totalIncome: 0, totalExpenses: 0, balance: 0, transactionCount: 0 })
   const [filters, setFilters] = useState<Filters>({ category: 'All', currency: 'All', search: '' })
+  const [cashflowSortBy, setCashflowSortBy] = useState<CashflowSortField | null>(null)
+  const [cashflowSortOrder, setCashflowSortOrder] = useState<SortOrder>('asc')
   const [loading, setLoading] = useState(false)
 
   const fetchData = async () => {
     setLoading(true)
     try {
       const [entriesData, summaryData] = await Promise.all([
-        cashflowAPI.getAll(filters),
+        cashflowAPI.getAll({ ...filters, ...(cashflowSortBy && { sortBy: cashflowSortBy, sortOrder: cashflowSortOrder }) }),
         cashflowAPI.getSummary()
       ])
       setEntries(entriesData)
@@ -65,10 +70,23 @@ export default function App() {
     if (isAuthenticated) {
       fetchData()
     }
-  }, [isAuthenticated, filters])
+  }, [isAuthenticated, filters, cashflowSortBy, cashflowSortOrder])
 
   const handleFilterChange = (newFilters: Filters) => {
     setFilters(newFilters)
+  }
+
+  const handleCashflowSort = (field: CashflowSortField) => {
+    if (cashflowSortBy === field) {
+      if (cashflowSortOrder === 'asc') {
+        setCashflowSortOrder('desc')
+      } else {
+        setCashflowSortBy(null)
+      }
+    } else {
+      setCashflowSortBy(field)
+      setCashflowSortOrder('asc')
+    }
   }
 
   const handleDelete = async (id: string) => {
@@ -127,11 +145,11 @@ export default function App() {
                 <TabsContent value="cashflow" className="mt-6 space-y-6">
                   <SummaryCards summary={summary} />
                   <FilterBar onFilterChange={handleFilterChange} />
-                  {loading ? (
-                    <div className="flex items-center justify-center py-12 text-muted-foreground">Loading...</div>
-                  ) : (
-                    <CashflowTable entries={entries} onDelete={handleDelete} />
-                  )}
+{loading ? (
+                     <div className="flex items-center justify-center py-12 text-muted-foreground">Loading...</div>
+                   ) : (
+                     <CashflowTable entries={entries} onDelete={handleDelete} sortBy={cashflowSortBy} sortOrder={cashflowSortOrder} onSort={handleCashflowSort} />
+                   )}
                 </TabsContent>
 
                 <TabsContent value="tasks" className="mt-6">
