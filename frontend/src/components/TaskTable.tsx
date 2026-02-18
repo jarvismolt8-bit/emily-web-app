@@ -1,0 +1,106 @@
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import { MoreHorizontal, Pencil, Trash2 } from 'lucide-react'
+
+const PRIORITY_COLORS: Record<string, string> = {
+  'high': 'text-rose-500',
+  'medium': 'text-amber-500',
+  'low': 'text-emerald-500'
+}
+
+interface Task {
+  id: string
+  name: string
+  date?: string
+  time?: string
+  status: string
+  priority: string
+}
+
+interface TaskTableProps {
+  tasks: Task[]
+  onEdit: (task: Task) => void
+  onDelete: (id: string) => void
+}
+
+export default function TaskTable({ tasks, onEdit, onDelete }: TaskTableProps) {
+  return (
+    <div className="overflow-x-auto rounded-lg border">
+      <Table>
+        <TableHeader>
+          <TableRow className="hover:bg-transparent">
+            <TableHead className="h-11 w-[60px]">ID</TableHead>
+            <TableHead>Task</TableHead>
+            <TableHead>Due</TableHead>
+            <TableHead>Status</TableHead>
+            <TableHead>Priority</TableHead>
+            <TableHead className="w-[50px]"></TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {tasks.length === 0 ? (
+            <TableRow>
+              <TableCell colSpan={6} className="h-32 text-center text-muted-foreground">
+                No tasks found
+              </TableCell>
+            </TableRow>
+          ) : (
+            tasks.map((task) => (
+              <TableRow key={task.id}>
+                <TableCell className="font-mono text-muted-foreground">{task.id}</TableCell>
+                <TableCell className="font-medium">{task.name}</TableCell>
+                <TableCell className="whitespace-nowrap text-muted-foreground">
+                  {task.date ? `${task.date}${task.time ? ` ${task.time}` : ''}` : '-'}
+                </TableCell>
+                <TableCell>
+                  <Badge variant={task.status === 'done' ? 'default' : 'outline'} className="font-normal">
+                    {task.status}
+                  </Badge>
+                </TableCell>
+                <TableCell className={`capitalize font-medium ${PRIORITY_COLORS[task.priority] || 'text-muted-foreground'}`}>
+                  {task.priority}
+                </TableCell>
+                <TableCell>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="icon" className="h-8 w-8">
+                        <MoreHorizontal className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={() => onEdit(task)}>
+                        <Pencil className="h-4 w-4 mr-2" />
+                        Edit
+                      </DropdownMenuItem>
+                      <DropdownMenuItem 
+                        onClick={() => onDelete(task.id)}
+                        className="text-destructive focus:text-destructive"
+                      >
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        Delete
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </TableCell>
+              </TableRow>
+            ))
+          )}
+        </TableBody>
+      </Table>
+    </div>
+  )
+}
