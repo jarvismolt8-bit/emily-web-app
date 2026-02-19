@@ -43,7 +43,7 @@ export function DatePicker({ value, onChange, placeholder = 'Pick a date' }: Dat
         </Button>
       </PopoverTrigger>
       <PopoverContent 
-        className="w-auto p-0 z-[100]" 
+        className="w-auto p-0 z-[9999]" 
         align="start"
         side="bottom"
         sideOffset={4}

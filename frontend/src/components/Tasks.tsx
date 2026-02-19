@@ -2,20 +2,24 @@ import { useState, useEffect } from 'react'
 import { tasksAPI } from '../api/tasks'
 import TaskTable from './TaskTable'
 import TaskModal from './TaskModal'
+import TaskKanban from './TaskKanban'
 import { Button } from '@/components/ui/button'
-import { Plus } from 'lucide-react'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Plus, LayoutGrid, List } from 'lucide-react'
 
 interface Task {
   id: string
   name: string
+  description?: string
   date?: string
   time?: string
-  status: string
-  priority: string
+  status: 'backlog' | 'in_progress' | 'done'
+  priority: 'high' | 'medium' | 'low'
 }
 
 interface TaskFormData {
   name: string
+  description: string
   date: string
   time: string
   status: string
@@ -24,6 +28,7 @@ interface TaskFormData {
 
 type SortField = 'id' | 'date' | 'priority'
 type SortOrder = 'asc' | 'desc'
+type ViewMode = 'table' | 'kanban'
 
 interface TasksProps {
   showAddButton?: boolean
@@ -36,6 +41,7 @@ export default function Tasks({ showAddButton = true }: TasksProps) {
   const [editingTask, setEditingTask] = useState<Task | null>(null)
   const [sortBy, setSortBy] = useState<SortField | null>(null)
   const [sortOrder, setSortOrder] = useState<SortOrder>('desc')
+  const [viewMode, setViewMode] = useState<ViewMode>('kanban')
 
   const fetchTasks = async () => {
     setLoading(true)
@@ -86,6 +92,16 @@ export default function Tasks({ showAddButton = true }: TasksProps) {
     }
   }
 
+  const handleStatusChange = async (taskId: string, newStatus: Task['status']) => {
+    setTasks(prev => prev.map(t => t.id === taskId ? { ...t, status: newStatus } : t))
+    try {
+      await tasksAPI.updateStatus(taskId, newStatus)
+    } catch (error) {
+      console.error('Error updating task status:', error)
+      fetchTasks()
+    }
+  }
+
   const handleSave = async (formData: TaskFormData) => {
     try {
       if (editingTask) {
@@ -106,25 +122,52 @@ export default function Tasks({ showAddButton = true }: TasksProps) {
 
   return (
     <>
-      {showAddButton && (
-        <div className="flex justify-end mb-4">
+      <div className="flex justify-between items-center mb-4">
+        <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as ViewMode)}>
+          <TabsList>
+            <TabsTrigger value="table" className="gap-1.5">
+              <List className="h-4 w-4" />
+              Table
+            </TabsTrigger>
+            <TabsTrigger value="kanban" className="gap-1.5">
+              <LayoutGrid className="h-4 w-4" />
+              Kanban
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
+        
+        {showAddButton && (
           <Button onClick={handleAdd} size="sm">
             <Plus className="h-4 w-4 mr-1.5" />
             Add Task
           </Button>
-        </div>
-      )}
+        )}
+      </div>
 
       {loading ? (
         <div className="flex items-center justify-center py-12 text-muted-foreground">Loading...</div>
+      ) : viewMode === 'table' ? (
+        <TaskTable 
+          tasks={tasks} 
+          onEdit={handleEdit} 
+          onDelete={handleDelete} 
+          sortBy={sortBy} 
+          sortOrder={sortOrder} 
+          onSort={handleSort} 
+        />
       ) : (
-        <TaskTable tasks={tasks} onEdit={handleEdit} onDelete={handleDelete} sortBy={sortBy} sortOrder={sortOrder} onSort={handleSort} />
+        <TaskKanban 
+          tasks={tasks} 
+          onEdit={handleEdit} 
+          onStatusChange={handleStatusChange}
+        />
       )}
 
       <TaskModal
         isOpen={isModalOpen}
         onClose={handleCloseModal}
         onSave={handleSave}
+        onDelete={handleDelete}
         task={editingTask}
       />
     </>

@@ -38,14 +38,15 @@ const tasksRepo = {
   create(data) {
     const id = this.generateId();
     getDb().prepare(`
-      INSERT INTO tasks (id, name, date, time, status, priority)
-      VALUES (?, ?, ?, ?, ?, ?)
+      INSERT INTO tasks (id, name, description, date, time, status, priority)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
     `).run(
       id,
       (data.name || '').trim(),
+      data.description || '',
       data.date || '',
       data.time || '',
-      data.status || 'active',
+      data.status || 'backlog',
       data.priority || 'medium'
     );
     return this.findById(id);
@@ -57,7 +58,7 @@ const tasksRepo = {
 
     const fields = [];
     const params = [];
-    for (const key of ['name', 'date', 'time', 'status', 'priority']) {
+    for (const key of ['name', 'description', 'date', 'time', 'status', 'priority']) {
       if (data[key] !== undefined) {
         fields.push(`${key} = ?`);
         params.push(key === 'name' ? data[key].trim() : data[key]);

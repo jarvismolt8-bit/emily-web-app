@@ -22,13 +22,20 @@ const PRIORITY_COLORS: Record<string, string> = {
   'low': 'text-emerald-500'
 }
 
+const STATUS_CONFIG: Record<string, { label: string; variant: 'outline' | 'secondary' | 'default' }> = {
+  'backlog': { label: 'Backlog', variant: 'outline' },
+  'in_progress': { label: 'In Progress', variant: 'secondary' },
+  'done': { label: 'Done', variant: 'default' }
+}
+
 interface Task {
   id: string
   name: string
+  description?: string
   date?: string
   time?: string
-  status: string
-  priority: string
+  status: 'backlog' | 'in_progress' | 'done'
+  priority: 'high' | 'medium' | 'low'
 }
 
 type SortField = 'id' | 'date' | 'priority'
@@ -60,6 +67,7 @@ export default function TaskTable({ tasks, onEdit, onDelete, sortBy, sortOrder, 
               ID<SortIndicator field="id" currentField={sortBy} currentOrder={sortOrder} />
             </TableHead>
             <TableHead>Task</TableHead>
+            <TableHead>Description</TableHead>
             <TableHead className="cursor-pointer select-none hover:text-foreground" onClick={() => onSort?.('date')}>
               Due<SortIndicator field="date" currentField={sortBy} currentOrder={sortOrder} />
             </TableHead>
@@ -73,7 +81,7 @@ export default function TaskTable({ tasks, onEdit, onDelete, sortBy, sortOrder, 
         <TableBody>
           {tasks.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={6} className="h-32 text-center text-muted-foreground">
+              <TableCell colSpan={7} className="h-32 text-center text-muted-foreground">
                 No tasks found
               </TableCell>
             </TableRow>
@@ -82,12 +90,15 @@ export default function TaskTable({ tasks, onEdit, onDelete, sortBy, sortOrder, 
               <TableRow key={task.id}>
                 <TableCell className="font-mono text-muted-foreground">{task.id}</TableCell>
                 <TableCell className="font-medium">{task.name}</TableCell>
+                <TableCell className="text-muted-foreground max-w-[200px] truncate">
+                  {task.description || '-'}
+                </TableCell>
                 <TableCell className="whitespace-nowrap text-muted-foreground">
                   {task.date ? `${task.date}${task.time ? ` ${task.time}` : ''}` : '-'}
                 </TableCell>
                 <TableCell>
-                  <Badge variant={task.status === 'done' ? 'default' : 'outline'} className="font-normal">
-                    {task.status}
+                  <Badge variant={STATUS_CONFIG[task.status]?.variant || 'outline'} className="font-normal">
+                    {STATUS_CONFIG[task.status]?.label || task.status}
                   </Badge>
                 </TableCell>
                 <TableCell className={`capitalize font-medium ${PRIORITY_COLORS[task.priority] || 'text-muted-foreground'}`}>

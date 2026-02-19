@@ -27,14 +27,16 @@ interface TaskFilters {
 interface Task {
   id: string
   name: string
+  description?: string
   date?: string
   time?: string
-  status: string
-  priority: string
+  status: 'backlog' | 'in_progress' | 'done'
+  priority: 'high' | 'medium' | 'low'
 }
 
 interface TaskFormData {
   name: string
+  description: string
   date: string
   time: string
   status: string
@@ -77,6 +79,15 @@ export const tasksAPI = {
       method: 'PUT',
       headers: headers(),
       body: JSON.stringify(task)
+    })
+    return unwrapResponse<Task>(response)
+  },
+
+  updateStatus: async (id: string, status: 'backlog' | 'in_progress' | 'done'): Promise<Task> => {
+    const response = await fetch(`${API_BASE}/tasks/${id}`, {
+      method: 'PUT',
+      headers: headers(),
+      body: JSON.stringify({ status })
     })
     return unwrapResponse<Task>(response)
   },

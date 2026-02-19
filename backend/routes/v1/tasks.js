@@ -28,13 +28,13 @@ router.get('/:id', (req, res) => {
 
 router.post('/', (req, res) => {
   try {
-    const { name, date, time, status, priority } = req.body;
+    const { name, description, date, time, status, priority } = req.body;
 
     if (!name) {
       return sendError(res, 'VALIDATION_ERROR', 'Task name is required', 400);
     }
 
-    const newTask = tasksRepo.create({ name, date, time, status, priority });
+    const newTask = tasksRepo.create({ name, description, date, time, status, priority });
 
     logActivityFromReq(
       req,
@@ -43,6 +43,7 @@ router.post('/', (req, res) => {
       {
         task_id: newTask.id,
         task_name: newTask.name,
+        description: newTask.description,
         status: newTask.status,
         priority: newTask.priority
       },
@@ -80,17 +81,33 @@ router.put('/:id', (req, res) => {
 
     const updatedTask = tasksRepo.update(req.params.id, req.body);
 
-    logActivityFromReq(
-      req,
-      'task_update',
-      `Updated task: ${updatedTask.name}`,
-      {
-        task_id: req.params.id,
-        old_values: oldTask,
-        new_values: updatedTask
-      },
-      'success'
-    );
+    // Log status change separately
+    if (oldTask.status !== updatedTask.status) {
+      logActivityFromReq(
+        req,
+        'task_status_change',
+        `Changed task "${updatedTask.name}" status from ${oldTask.status} to ${updatedTask.status}`,
+        {
+          task_id: req.params.id,
+          task_name: updatedTask.name,
+          old_status: oldTask.status,
+          new_status: updatedTask.status
+        },
+        'success'
+      );
+    } else {
+      logActivityFromReq(
+        req,
+        'task_update',
+        `Updated task: ${updatedTask.name}`,
+        {
+          task_id: req.params.id,
+          old_values: oldTask,
+          new_values: updatedTask
+        },
+        'success'
+      );
+    }
 
     sendSuccess(res, updatedTask, 'Task updated');
   } catch (error) {

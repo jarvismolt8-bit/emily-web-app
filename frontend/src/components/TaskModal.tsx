@@ -17,15 +17,22 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { DatePicker } from '@/components/ui/date-picker'
 import { TimePicker } from '@/components/ui/time-picker'
+import { Textarea } from '@/components/ui/textarea'
+import { Trash2 } from 'lucide-react'
 
-const STATUSES = ['active', 'done']
+const STATUSES = ['backlog', 'in_progress', 'done']
+const STATUS_LABELS: Record<string, string> = {
+  'backlog': 'Backlog',
+  'in_progress': 'In Progress',
+  'done': 'Done'
+}
 const PRIORITIES = ['low', 'medium', 'high']
 
 interface Task {
   id?: string
   name?: string
+  description?: string
   date?: string
   time?: string
   status?: string
@@ -34,6 +41,7 @@ interface Task {
 
 interface TaskFormData {
   name: string
+  description: string
   date: string
   time: string
   status: string
@@ -44,17 +52,51 @@ interface TaskModalProps {
   isOpen: boolean
   onClose: () => void
   onSave: (formData: TaskFormData) => void
+  onDelete?: (id: string) => void
   task: Task | null
 }
 
-export default function TaskModal({ isOpen, onClose, onSave, task }: TaskModalProps) {
+export default function TaskModal({ isOpen, onClose, onSave, onDelete, task }: TaskModalProps) {
   const [formData, setFormData] = useState<TaskFormData>({
     name: '',
+    description: '',
     date: '',
     time: '',
-    status: 'active',
+    status: 'backlog',
     priority: 'medium'
   })
+
+  useEffect(() => {
+    if (task) {
+      let dateValue = ''
+      if (task.date) {
+        try {
+          const parsedDate = parse(task.date, 'MMM d yyyy', new Date())
+          dateValue = format(parsedDate, 'yyyy-MM-dd')
+        } catch {
+          dateValue = task.date
+        }
+      }
+      
+      setFormData({
+        name: task.name || '',
+        description: task.description || '',
+        date: dateValue,
+        time: task.time || '',
+        status: task.status || 'backlog',
+        priority: task.priority || 'medium'
+      })
+    } else {
+      setFormData({
+        name: '',
+        description: '',
+        date: '',
+        time: '',
+        status: 'backlog',
+        priority: 'medium'
+      })
+    }
+  }, [task, isOpen])
 
   useEffect(() => {
     if (task) {
@@ -127,16 +169,28 @@ export default function TaskModal({ isOpen, onClose, onSave, task }: TaskModalPr
             />
           </div>
 
+          <div className="mb-4">
+            <Label htmlFor="description" className="text-muted-foreground">Description (optional)</Label>
+            <Textarea
+              id="description"
+              value={formData.description}
+              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+              placeholder="Add details about this task..."
+              className="mt-2"
+              rows={3}
+            />
+          </div>
+
           <div className="grid grid-cols-2 gap-4 mb-4">
             <div>
-              <Label className="text-muted-foreground">Date</Label>
-              <div className="mt-2">
-                <DatePicker
-                  value={formData.date}
-                  onChange={(val) => setFormData({ ...formData, date: val })}
-                  placeholder="Select date"
-                />
-              </div>
+              <Label htmlFor="date" className="text-muted-foreground">Date</Label>
+              <Input
+                id="date"
+                type="date"
+                value={formData.date}
+                onChange={(e) => setFormData({ ...formData, date: e.target.value })}
+                className="mt-2"
+              />
             </div>
             <div>
               <Label className="text-muted-foreground">Time</Label>
@@ -161,7 +215,7 @@ export default function TaskModal({ isOpen, onClose, onSave, task }: TaskModalPr
                 </SelectTrigger>
                 <SelectContent>
                   {STATUSES.map(status => (
-                    <SelectItem key={status} value={status}>{status}</SelectItem>
+                    <SelectItem key={status} value={status}>{STATUS_LABELS[status]}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -184,7 +238,21 @@ export default function TaskModal({ isOpen, onClose, onSave, task }: TaskModalPr
             </div>
           </div>
 
-          <DialogFooter>
+          <DialogFooter className="gap-2">
+            {task && task.id && onDelete && (
+              <Button
+                type="button"
+                variant="destructive"
+                onClick={() => {
+                  onDelete(task.id!)
+                  onClose()
+                }}
+              >
+                <Trash2 className="h-4 w-4 mr-1" />
+                Delete
+              </Button>
+            )}
+            <div className="flex-1" />
             <Button type="button" variant="outline" onClick={onClose}>
               Cancel
             </Button>
