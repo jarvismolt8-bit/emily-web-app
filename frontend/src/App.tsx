@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useAuth } from './hooks/useAuth'
 import PasswordGate from './components/PasswordGate'
 import SummaryCards from './components/SummaryCards'
@@ -8,6 +8,7 @@ import Tasks from './components/Tasks'
 import ActivityLogs from './components/ActivityLogs'
 import ChatWidget from './components/ChatWidget'
 import { cashflowAPI } from './api/cashflow'
+import { useRealtimeCashflow } from './hooks/useRealtimeData'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
 import { ThemeToggle } from './components/ThemeToggle'
@@ -44,33 +45,31 @@ interface Summary {
 export default function App() {
   const { isAuthenticated, login, logout } = useAuth()
   const [activeTab, setActiveTab] = useState('cashflow')
-  const [entries, setEntries] = useState<CashflowEntry[]>([])
   const [summary, setSummary] = useState<Summary>({ totalIncome: 0, totalExpenses: 0, balance: 0, transactionCount: 0 })
   const [filters, setFilters] = useState<Filters>({ category: 'All', currency: 'All', search: '' })
   const [cashflowSortBy, setCashflowSortBy] = useState<CashflowSortField | null>(null)
   const [cashflowSortOrder, setCashflowSortOrder] = useState<SortOrder>('asc')
-  const [loading, setLoading] = useState(false)
 
-  const fetchData = async () => {
-    setLoading(true)
-    try {
-      const [entriesData, summaryData] = await Promise.all([
-        cashflowAPI.getAll({ ...filters, ...(cashflowSortBy && { sortBy: cashflowSortBy, sortOrder: cashflowSortOrder }) }),
-        cashflowAPI.getSummary()
-      ])
-      setEntries(entriesData)
-      setSummary(summaryData)
-    } catch (error) {
-      console.error('Error fetching data:', error)
-    }
-    setLoading(false)
-  }
+  const fetchCashflow = useCallback(async () => {
+    return cashflowAPI.getAll({ 
+      ...filters, 
+      ...(cashflowSortBy && { sortBy: cashflowSortBy, sortOrder: cashflowSortOrder }) 
+    })
+  }, [filters, cashflowSortBy, cashflowSortOrder])
+
+  const { data: entries, loading, refresh } = useRealtimeCashflow(fetchCashflow)
 
   useEffect(() => {
     if (isAuthenticated) {
-      fetchData()
+      cashflowAPI.getSummary().then(setSummary).catch(console.error)
     }
-  }, [isAuthenticated, filters, cashflowSortBy, cashflowSortOrder])
+  }, [isAuthenticated, entries])
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      refresh()
+    }
+  }, [isAuthenticated, filters, cashflowSortBy, cashflowSortOrder, refresh])
 
   const handleFilterChange = (newFilters: Filters) => {
     setFilters(newFilters)
@@ -93,7 +92,8 @@ export default function App() {
     if (window.confirm('Delete this transaction?')) {
       try {
         await cashflowAPI.delete(id)
-        fetchData()
+        refresh()
+        cashflowAPI.getSummary().then(setSummary).catch(console.error)
       } catch (error) {
         console.error('Error deleting entry:', error)
       }

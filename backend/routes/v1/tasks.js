@@ -34,7 +34,8 @@ router.post('/', (req, res) => {
       return sendError(res, 'VALIDATION_ERROR', 'Task name is required', 400);
     }
 
-    const newTask = tasksRepo.create({ name, description, date, time, status, priority });
+    const source = req.body.source || req.source || 'web_app';
+    const newTask = tasksRepo.create({ name, description, date, time, status, priority }, source);
 
     logActivityFromReq(
       req,
@@ -79,9 +80,9 @@ router.put('/:id', (req, res) => {
       return sendError(res, 'RESOURCE_NOT_FOUND', 'Task not found', 404);
     }
 
-    const updatedTask = tasksRepo.update(req.params.id, req.body);
+    const source = req.body.source || req.source || 'web_app';
+    const updatedTask = tasksRepo.update(req.params.id, req.body, source);
 
-    // Log status change separately
     if (oldTask.status !== updatedTask.status) {
       logActivityFromReq(
         req,
@@ -125,7 +126,8 @@ router.put('/:id', (req, res) => {
 
 router.delete('/:id', (req, res) => {
   try {
-    const deletedTask = tasksRepo.delete(req.params.id);
+    const source = req.query.source || req.source || 'web_app';
+    const deletedTask = tasksRepo.delete(req.params.id, source);
     if (!deletedTask) {
       logActivityFromReq(
         req,
@@ -171,7 +173,8 @@ router.delete('/', (req, res) => {
       return sendError(res, 'VALIDATION_ERROR', 'Task name is required (use ?name=...)', 400);
     }
 
-    const deletedTask = tasksRepo.deleteByName(name);
+    const source = req.query.source || req.source || 'web_app';
+    const deletedTask = tasksRepo.deleteByName(name, source);
     if (!deletedTask) {
       return sendError(res, 'RESOURCE_NOT_FOUND', `Task "${name}" not found`, 404);
     }

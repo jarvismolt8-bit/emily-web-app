@@ -37,7 +37,8 @@ router.get('/:id', (req, res) => {
 
 router.post('/', (req, res) => {
   try {
-    const newEntry = cashflowRepo.create(req.body);
+    const source = req.body.source || req.source || 'web_app';
+    const newEntry = cashflowRepo.create(req.body, source);
 
     logActivityFromReq(
       req,
@@ -81,7 +82,8 @@ router.put('/:id', (req, res) => {
       return sendError(res, 'RESOURCE_NOT_FOUND', 'Transaction not found', 404);
     }
 
-    const updatedEntry = cashflowRepo.update(req.params.id, req.body);
+    const source = req.body.source || req.source || 'web_app';
+    const updatedEntry = cashflowRepo.update(req.params.id, req.body, source);
 
     logActivityFromReq(
       req,
@@ -111,7 +113,8 @@ router.put('/:id', (req, res) => {
 
 router.delete('/:id', (req, res) => {
   try {
-    const deletedEntry = cashflowRepo.delete(req.params.id);
+    const source = req.query.source || req.source || 'web_app';
+    const deletedEntry = cashflowRepo.delete(req.params.id, source);
     if (!deletedEntry) {
       logActivityFromReq(
         req,

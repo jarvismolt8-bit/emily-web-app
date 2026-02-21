@@ -1,4 +1,5 @@
 const { getDb } = require('../db');
+const eventBus = require('../events');
 
 const PRIORITY_ORDER = { high: 0, medium: 1, low: 2 };
 
@@ -35,7 +36,7 @@ const tasksRepo = {
     return String(maxId + 1).padStart(3, '0');
   },
 
-  create(data) {
+  create(data, source = 'web_app') {
     const id = this.generateId();
     getDb().prepare(`
       INSERT INTO tasks (id, name, description, date, time, status, priority)
@@ -49,10 +50,16 @@ const tasksRepo = {
       data.status || 'backlog',
       data.priority || 'medium'
     );
-    return this.findById(id);
+    const task = this.findById(id);
+    
+    if (source !== 'web_app') {
+      eventBus.emit('task:created', { data: task, source, timestamp: new Date().toISOString() });
+    }
+    
+    return task;
   },
 
-  update(id, data) {
+  update(id, data, source = 'web_app') {
     const existing = this.findById(id);
     if (!existing) return null;
 
@@ -70,20 +77,36 @@ const tasksRepo = {
     params.push(id);
 
     getDb().prepare(`UPDATE tasks SET ${fields.join(', ')} WHERE id = ?`).run(...params);
-    return this.findById(id);
+    const task = this.findById(id);
+    
+    if (source !== 'web_app') {
+      eventBus.emit('task:updated', { data: task, source, timestamp: new Date().toISOString() });
+    }
+    
+    return task;
   },
 
-  delete(id) {
+  delete(id, source = 'web_app') {
     const existing = this.findById(id);
     if (!existing) return null;
     getDb().prepare('DELETE FROM tasks WHERE id = ?').run(id);
+    
+    if (source !== 'web_app') {
+      eventBus.emit('task:deleted', { data: existing, source, timestamp: new Date().toISOString() });
+    }
+    
     return existing;
   },
 
-  deleteByName(name) {
+  deleteByName(name, source = 'web_app') {
     const existing = this.findByName(name);
     if (!existing) return null;
     getDb().prepare('DELETE FROM tasks WHERE id = ?').run(existing.id);
+    
+    if (source !== 'web_app') {
+      eventBus.emit('task:deleted', { data: existing, source, timestamp: new Date().toISOString() });
+    }
+    
     return existing;
   }
 };

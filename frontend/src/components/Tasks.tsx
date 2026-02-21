@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { tasksAPI } from '../api/tasks'
+import { useRealtimeTasks } from '../hooks/useRealtimeData'
 import TaskTable from './TaskTable'
 import TaskModal from './TaskModal'
 import TaskKanban from './TaskKanban'
@@ -35,28 +36,21 @@ interface TasksProps {
 }
 
 export default function Tasks({ showAddButton = true }: TasksProps) {
-  const [tasks, setTasks] = useState<Task[]>([])
-  const [loading, setLoading] = useState(false)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingTask, setEditingTask] = useState<Task | null>(null)
   const [sortBy, setSortBy] = useState<SortField | null>(null)
   const [sortOrder, setSortOrder] = useState<SortOrder>('desc')
   const [viewMode, setViewMode] = useState<ViewMode>('kanban')
 
-  const fetchTasks = async () => {
-    setLoading(true)
-    try {
-      const data = await tasksAPI.getAll(sortBy ? { sortBy, sortOrder } : undefined)
-      setTasks(data)
-    } catch (error) {
-      console.error('Error fetching tasks:', error)
-    }
-    setLoading(false)
-  }
+  const fetchTasks = useCallback(async () => {
+    return tasksAPI.getAll(sortBy ? { sortBy, sortOrder } : undefined)
+  }, [sortBy, sortOrder])
+
+  const { data: tasks, loading, refresh: fetchTasksRefresh } = useRealtimeTasks(fetchTasks)
 
   useEffect(() => {
-    fetchTasks()
-  }, [sortBy, sortOrder])
+    fetchTasksRefresh()
+  }, [sortBy, sortOrder, fetchTasksRefresh])
 
   const handleSort = (field: SortField) => {
     if (sortBy === field) {
@@ -85,7 +79,7 @@ export default function Tasks({ showAddButton = true }: TasksProps) {
     if (window.confirm('Delete this task?')) {
       try {
         await tasksAPI.delete(id)
-        fetchTasks()
+        fetchTasksRefresh()
       } catch (error) {
         console.error('Error deleting task:', error)
       }
@@ -93,12 +87,12 @@ export default function Tasks({ showAddButton = true }: TasksProps) {
   }
 
   const handleStatusChange = async (taskId: string, newStatus: Task['status']) => {
-    setTasks(prev => prev.map(t => t.id === taskId ? { ...t, status: newStatus } : t))
     try {
       await tasksAPI.updateStatus(taskId, newStatus)
+      fetchTasksRefresh()
     } catch (error) {
       console.error('Error updating task status:', error)
-      fetchTasks()
+      fetchTasksRefresh()
     }
   }
 
@@ -109,7 +103,7 @@ export default function Tasks({ showAddButton = true }: TasksProps) {
       } else {
         await tasksAPI.add(formData)
       }
-      fetchTasks()
+      fetchTasksRefresh()
     } catch (error) {
       console.error('Error saving task:', error)
     }

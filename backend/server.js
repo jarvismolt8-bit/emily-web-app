@@ -10,6 +10,8 @@ require('dotenv').config();
 const { getDb } = require('./db');
 getDb();
 
+const eventBus = require('./events');
+
 const swaggerDocument = YAML.load(path.join(__dirname, 'swagger.yaml'));
 
 const gatewayClient = require('./gateway-client');
@@ -80,8 +82,8 @@ app.get('/api/summary', verifyPassword, (req, res) => {
 
 app.post('/api/cashflow', verifyPassword, (req, res) => {
   try {
-    const newEntry = cashflowRepo.create(req.body);
     const source = req.body.source || 'web_app';
+    const newEntry = cashflowRepo.create(req.body, source);
 
     logActivity({
       source,
@@ -128,7 +130,7 @@ app.put('/api/cashflow/:id', verifyPassword, (req, res) => {
       return res.status(404).json({ error: 'Entry not found' });
     }
 
-    const updatedEntry = cashflowRepo.update(req.params.id, req.body);
+    const updatedEntry = cashflowRepo.update(req.params.id, req.body, source);
 
     logActivity({
       source,
@@ -160,7 +162,7 @@ app.put('/api/cashflow/:id', verifyPassword, (req, res) => {
 app.delete('/api/cashflow/:id', verifyPassword, (req, res) => {
   try {
     const source = req.query.source || 'web_app';
-    const deletedEntry = cashflowRepo.delete(req.params.id);
+    const deletedEntry = cashflowRepo.delete(req.params.id, source);
 
     if (!deletedEntry) {
       logActivity({
@@ -212,7 +214,7 @@ app.get('/api/tasks', verifyPassword, (req, res) => {
 app.post('/api/tasks', verifyPassword, (req, res) => {
   try {
     const source = req.body.source || 'web_app';
-    const newTask = tasksRepo.create(req.body);
+    const newTask = tasksRepo.create(req.body, source);
 
     logActivity({
       source,
@@ -259,7 +261,7 @@ app.put('/api/tasks/:id', verifyPassword, (req, res) => {
       return res.status(404).json({ error: 'Task not found' });
     }
 
-    const updatedTask = tasksRepo.update(req.params.id, req.body);
+    const updatedTask = tasksRepo.update(req.params.id, req.body, source);
 
     logActivity({
       source,
@@ -291,7 +293,7 @@ app.put('/api/tasks/:id', verifyPassword, (req, res) => {
 app.delete('/api/tasks/:id', verifyPassword, (req, res) => {
   try {
     const source = req.query.source || 'web_app';
-    const deletedTask = tasksRepo.delete(req.params.id);
+    const deletedTask = tasksRepo.delete(req.params.id, source);
 
     if (!deletedTask) {
       logActivity({
@@ -376,6 +378,55 @@ app.post('/api/activity-logs', verifyPassword, (req, res) => {
   }
 });
 
+const sseClients = new Set();
+
+app.get('/api/v1/events', (req, res) => {
+  const password = req.query.password || req.headers['x-password'];
+  if (password !== WEB_PASSWORD) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.setHeader('X-Accel-Buffering', 'no');
+  res.flushHeaders();
+
+  const clientId = Date.now();
+  sseClients.add({ id: clientId, res });
+  console.log(`[SSE] Client connected: ${clientId}, total clients: ${sseClients.size}`);
+
+  res.write(`data: ${JSON.stringify({ type: 'connected', timestamp: new Date().toISOString() })}\n\n`);
+
+  const heartbeat = setInterval(() => {
+    res.write(': heartbeat\n\n');
+  }, 30000);
+
+  req.on('close', () => {
+    clearInterval(heartbeat);
+    sseClients.delete(clientId);
+    console.log(`[SSE] Client disconnected: ${clientId}, total clients: ${sseClients.size}`);
+  });
+});
+
+function broadcastSSE(eventType, payload) {
+  const message = `data: ${JSON.stringify({ type: eventType, ...payload })}\n\n`;
+  sseClients.forEach(client => {
+    try {
+      client.res.write(message);
+    } catch (err) {
+      console.error(`[SSE] Error sending to client ${client.id}:`, err.message);
+      sseClients.delete(client.id);
+    }
+  });
+}
+
+eventBus.on('cashflow:created', (payload) => broadcastSSE('cashflow:created', payload));
+eventBus.on('cashflow:updated', (payload) => broadcastSSE('cashflow:updated', payload));
+eventBus.on('cashflow:deleted', (payload) => broadcastSSE('cashflow:deleted', payload));
+eventBus.on('task:created', (payload) => broadcastSSE('task:created', payload));
+eventBus.on('task:updated', (payload) => broadcastSSE('task:updated', payload));
+eventBus.on('task:deleted', (payload) => broadcastSSE('task:deleted', payload));
+
 app.post('/api/emily/tasks/create', verifyPassword, (req, res) => {
   try {
     const { name, priority, date, time, source } = req.body;
@@ -387,10 +438,11 @@ app.post('/api/emily/tasks/create', verifyPassword, (req, res) => {
       });
     }
 
-    const newTask = tasksRepo.create({ name, priority, date, time });
+    const taskSource = source || 'telegram';
+    const newTask = tasksRepo.create({ name, priority, date, time }, taskSource);
 
     logActivity({
-      source: source || 'telegram',
+      source: taskSource,
       actionType: 'task_create',
       description: `Added task: ${newTask.name}`,
       details: {
@@ -421,6 +473,7 @@ app.post('/api/emily/tasks/update/:id', verifyPassword, (req, res) => {
   try {
     const { name, priority, date, time, source } = req.body;
     const taskId = req.params.id;
+    const taskSource = source || 'telegram';
 
     const oldTask = tasksRepo.findById(taskId);
     if (!oldTask) {
@@ -430,10 +483,10 @@ app.post('/api/emily/tasks/update/:id', verifyPassword, (req, res) => {
       });
     }
 
-    const updatedTask = tasksRepo.update(taskId, { name, priority, date, time });
+    const updatedTask = tasksRepo.update(taskId, { name, priority, date, time }, taskSource);
 
     logActivity({
-      source: source || 'telegram',
+      source: taskSource,
       actionType: 'task_update',
       description: `Updated task: ${updatedTask.name}`,
       details: {
@@ -465,8 +518,9 @@ app.post('/api/emily/tasks/delete/:id', verifyPassword, (req, res) => {
   try {
     const taskId = req.params.id;
     const { source } = req.body;
+    const taskSource = source || 'telegram';
 
-    const deletedTask = tasksRepo.delete(taskId);
+    const deletedTask = tasksRepo.delete(taskId, taskSource);
     if (!deletedTask) {
       return res.status(404).json({
         success: false,
@@ -475,7 +529,7 @@ app.post('/api/emily/tasks/delete/:id', verifyPassword, (req, res) => {
     }
 
     logActivity({
-      source: source || 'telegram',
+      source: taskSource,
       actionType: 'task_delete',
       description: `Deleted task: ${deletedTask.name}`,
       details: {
@@ -503,6 +557,7 @@ app.post('/api/emily/tasks/delete/:id', verifyPassword, (req, res) => {
 app.post('/api/emily/tasks/delete-by-name', verifyPassword, (req, res) => {
   try {
     const { task_name, source } = req.body;
+    const taskSource = source || 'telegram';
 
     if (!task_name) {
       return res.status(400).json({
@@ -511,7 +566,7 @@ app.post('/api/emily/tasks/delete-by-name', verifyPassword, (req, res) => {
       });
     }
 
-    const deletedTask = tasksRepo.deleteByName(task_name);
+    const deletedTask = tasksRepo.deleteByName(task_name, taskSource);
     if (!deletedTask) {
       return res.status(404).json({
         success: false,
@@ -520,7 +575,7 @@ app.post('/api/emily/tasks/delete-by-name', verifyPassword, (req, res) => {
     }
 
     logActivity({
-      source: source || 'telegram',
+      source: taskSource,
       actionType: 'task_delete',
       description: `Deleted task: ${deletedTask.name}`,
       details: {

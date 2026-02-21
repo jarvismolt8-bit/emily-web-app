@@ -1,4 +1,5 @@
 const { getDb } = require('../db');
+const eventBus = require('../events');
 
 function parseDateTime(dateStr, timeStr) {
   if (!dateStr) return 0;
@@ -81,7 +82,7 @@ const cashflowRepo = {
     };
   },
 
-  create(data) {
+  create(data, source = 'web_app') {
     const id = Date.now().toString();
     getDb().prepare(`
       INSERT INTO cashflow (id, item, amount, currency, date, time, timezone, category, notes)
@@ -97,10 +98,16 @@ const cashflowRepo = {
       data.category || 'Other',
       data.notes || ''
     );
-    return this.findById(id);
+    const entry = this.findById(id);
+    
+    if (source !== 'web_app') {
+      eventBus.emit('cashflow:created', { data: entry, source, timestamp: new Date().toISOString() });
+    }
+    
+    return entry;
   },
 
-  update(id, data) {
+  update(id, data, source = 'web_app') {
     const existing = this.findById(id);
     if (!existing) return null;
 
@@ -113,13 +120,24 @@ const cashflowRepo = {
       merged.date, merged.time, merged.timezone,
       merged.category, merged.notes, id
     );
-    return this.findById(id);
+    const entry = this.findById(id);
+    
+    if (source !== 'web_app') {
+      eventBus.emit('cashflow:updated', { data: entry, source, timestamp: new Date().toISOString() });
+    }
+    
+    return entry;
   },
 
-  delete(id) {
+  delete(id, source = 'web_app') {
     const existing = this.findById(id);
     if (!existing) return null;
     getDb().prepare('DELETE FROM cashflow WHERE id = ?').run(id);
+    
+    if (source !== 'web_app') {
+      eventBus.emit('cashflow:deleted', { data: existing, source, timestamp: new Date().toISOString() });
+    }
+    
     return existing;
   }
 };

@@ -98,36 +98,6 @@ export default function TaskModal({ isOpen, onClose, onSave, onDelete, task }: T
     }
   }, [task, isOpen])
 
-  useEffect(() => {
-    if (task) {
-      let dateValue = ''
-      if (task.date) {
-        try {
-          const parsedDate = parse(task.date, 'MMM d yyyy', new Date())
-          dateValue = format(parsedDate, 'yyyy-MM-dd')
-        } catch {
-          dateValue = task.date
-        }
-      }
-      
-      setFormData({
-        name: task.name || '',
-        date: dateValue,
-        time: task.time || '',
-        status: task.status || 'active',
-        priority: task.priority || 'medium'
-      })
-    } else {
-      setFormData({
-        name: '',
-        date: '',
-        time: '',
-        status: 'active',
-        priority: 'medium'
-      })
-    }
-  }, [task, isOpen])
-
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     
