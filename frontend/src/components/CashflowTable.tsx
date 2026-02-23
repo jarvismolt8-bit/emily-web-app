@@ -11,6 +11,8 @@ import { Trash2 } from 'lucide-react'
 
 const CATEGORY_EMOJIS: Record<string, string> = {
   'Income': '💰',
+  'Investment': '📊',
+  'investment': '📊',
   'Food': '🍔',
   'Transport': '🚗',
   'Utilities': '⚡',

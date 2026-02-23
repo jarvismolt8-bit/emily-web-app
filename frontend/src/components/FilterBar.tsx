@@ -9,7 +9,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 
-const CATEGORIES = ['All', 'Income', 'Food', 'Transport', 'Utilities', 'Shopping', 'Entertainment', 'Health', 'Airbnb', 'Other']
+const CATEGORIES = ['All', 'Income', 'Investment', 'Food', 'Transport', 'Utilities', 'Shopping', 'Entertainment', 'Health', 'Airbnb', 'Other']
 const CURRENCIES = ['All', 'PHP', 'USD', 'EUR']
 
 interface Filters {
