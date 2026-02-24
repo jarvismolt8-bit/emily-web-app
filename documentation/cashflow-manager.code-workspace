@@ -1,0 +1,20 @@
+{
+	"folders": [
+		{
+			"name": "cashflow-manager",
+			"path": ".."
+		},
+		{
+			"name": "find-your-seat",
+			"path": "../../find-your-seat"
+		},
+		{
+			"name": ".openclaw",
+			"path": "../../../../root/.openclaw"
+		},
+		{
+			"path": "../../../log"
+		}
+	],
+	"settings": {}
+}

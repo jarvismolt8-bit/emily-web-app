@@ -1,17 +1,22 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { 
+  getCachedMessages, 
+  setCachedMessages, 
+  clearCachedMessages,
+  type CachedMessage,
+  type ToolCall,
+  type ToolResult 
+} from '@/lib/storage'
 
-const STORAGE_KEY = 'emily_chat_session'
 const PASSWORD_KEY = 'emily_chat_password'
 const DEFAULT_PASSWORD = '10716255'
+const DISCONNECT_DELAY = 30000
 
-interface ChatMessage {
-  type: string
-  sender: 'user' | 'emily' | 'system' | 'error'
-  content: string
-  timestamp: string
+type ConnectionStatus = 'disconnected' | 'connecting' | 'connected'
+
+interface ChatMessage extends CachedMessage {
   clientId?: string
   isLocal?: boolean
-  isStreaming?: boolean
 }
 
 interface BroadcastEventData {
@@ -21,7 +26,7 @@ interface BroadcastEventData {
 
 export function useChat(userId = 'web-user') {
   const [messages, setMessages] = useState<ChatMessage[]>([])
-  const [isConnected, setIsConnected] = useState(false)
+  const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('disconnected')
   const [isTyping, setIsTyping] = useState(false)
   const [isExpanded, setIsExpanded] = useState(false)
   const [hasNewMessage, setHasNewMessage] = useState(false)
@@ -31,8 +36,10 @@ export function useChat(userId = 'web-user') {
   const reconnectAttempts = useRef(0)
   const maxReconnectAttempts = 5
   const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const disconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const bcRef = useRef<BroadcastChannel | null>(null)
   const sessionIdRef = useRef<string | null>(null)
+  const pendingMessagesRef = useRef<string[]>([])
 
   const getWebSocketUrl = useCallback(() => {
     if (typeof window === 'undefined') return 'ws://localhost:3001/api/chat'
@@ -44,13 +51,13 @@ export function useChat(userId = 'web-user') {
   const getSessionId = useCallback(() => {
     if (sessionIdRef.current) return sessionIdRef.current
     
-    const stored = sessionStorage.getItem(`${STORAGE_KEY}_id`)
+    const stored = sessionStorage.getItem('emily_chat_session_id')
     if (stored) {
       sessionIdRef.current = stored
     } else {
       const date = new Date().toISOString().split('T')[0]
       sessionIdRef.current = `web:${userId}:${date}`
-      sessionStorage.setItem(`${STORAGE_KEY}_id`, sessionIdRef.current)
+      sessionStorage.setItem('emily_chat_session_id', sessionIdRef.current)
     }
     return sessionIdRef.current
   }, [userId])
@@ -62,23 +69,10 @@ export function useChat(userId = 'web-user') {
   const setPassword = useCallback((password: string) => {
     localStorage.setItem(PASSWORD_KEY, password)
     setNeedsPassword(false)
-    setTimeout(() => connect(), 100)
   }, [])
 
   const hasPassword = useCallback(() => {
     return !!localStorage.getItem(PASSWORD_KEY)
-  }, [])
-
-  useEffect(() => {
-    const stored = sessionStorage.getItem(STORAGE_KEY)
-    if (stored) {
-      try {
-        const parsed = JSON.parse(stored)
-        setMessages(parsed.messages || [])
-      } catch (e) {
-        console.error('Failed to parse stored messages:', e)
-      }
-    }
   }, [])
 
   useEffect(() => {
@@ -88,10 +82,16 @@ export function useChat(userId = 'web-user') {
   }, [getPassword])
 
   useEffect(() => {
-    sessionStorage.setItem(STORAGE_KEY, JSON.stringify({
-      messages,
-      lastActive: new Date().toISOString()
-    }))
+    const cached = getCachedMessages()
+    if (cached.length > 0) {
+      setMessages(cached)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (messages.length > 0) {
+      setCachedMessages(messages)
+    }
   }, [messages])
 
   useEffect(() => {
@@ -118,6 +118,7 @@ export function useChat(userId = 'web-user') {
           setIsTyping(typingData.isTyping)
         } else if (type === 'clear') {
           setMessages([])
+          clearCachedMessages()
         } else if (type === 'auth_required') {
           setNeedsPassword(true)
         }
@@ -134,6 +135,19 @@ export function useChat(userId = 'web-user') {
   const broadcast = useCallback((type: string, data: ChatMessage | { isTyping: boolean } | Record<string, unknown>) => {
     if (bcRef.current) {
       bcRef.current.postMessage({ type, data })
+    }
+  }, [])
+
+  const disconnect = useCallback(() => {
+    if (wsRef.current) {
+      console.log('[Chat] Disconnecting...')
+      wsRef.current.close()
+      wsRef.current = null
+    }
+    setConnectionStatus('disconnected')
+    if (reconnectTimeoutRef.current) {
+      clearTimeout(reconnectTimeoutRef.current)
+      reconnectTimeoutRef.current = null
     }
   }, [])
 
@@ -157,14 +171,23 @@ export function useChat(userId = 'web-user') {
     const wsUrl = `${getWebSocketUrl()}?password=${encodeURIComponent(password)}&session=${sessionId}&userId=${userId}`
     
     console.log('[Chat] Connecting to backend...')
+    setConnectionStatus('connecting')
     
     try {
       wsRef.current = new WebSocket(wsUrl)
 
       wsRef.current.onopen = () => {
         console.log('[Chat] Connected to backend')
-        setIsConnected(true)
+        setConnectionStatus('connected')
         reconnectAttempts.current = 0
+        
+        if (pendingMessagesRef.current.length > 0) {
+          console.log(`[Chat] Sending ${pendingMessagesRef.current.length} pending messages`)
+          pendingMessagesRef.current.forEach(msg => {
+            wsRef.current?.send(msg)
+          })
+          pendingMessagesRef.current = []
+        }
       }
 
       wsRef.current.onmessage = (event) => {
@@ -178,12 +201,12 @@ export function useChat(userId = 'web-user') {
 
       wsRef.current.onclose = (event) => {
         console.log('[Chat] Disconnected:', event.code, event.reason)
-        setIsConnected(false)
+        setConnectionStatus('disconnected')
         
         if (event.code === 1008) {
           setNeedsPassword(true)
           broadcast('auth_required', {})
-        } else {
+        } else if (isExpanded) {
           attemptReconnect()
         }
       }
@@ -194,14 +217,69 @@ export function useChat(userId = 'web-user') {
 
     } catch (error) {
       console.error('[Chat] Connection error:', error)
-      attemptReconnect()
+      setConnectionStatus('disconnected')
+      if (isExpanded) {
+        attemptReconnect()
+      }
     }
-  }, [getPassword, getSessionId, getWebSocketUrl, userId, broadcast])
+  }, [getPassword, getSessionId, getWebSocketUrl, userId, broadcast, isExpanded])
+
+  const extractToolInfo = (content: unknown): { 
+    text: string; 
+    toolCalls?: ToolCall[]; 
+    toolResults?: ToolResult[];
+    thinking?: string;
+  } => {
+    const result = { text: '', toolCalls: [] as ToolCall[], toolResults: [] as ToolResult[], thinking: '' }
+    
+    if (typeof content === 'string') {
+      result.text = content
+      return result
+    }
+    
+    if (!Array.isArray(content)) {
+      return result
+    }
+    
+    const textParts: string[] = []
+    
+    for (const block of content) {
+      if (!block || typeof block !== 'object') continue
+      
+      const item = block as Record<string, unknown>
+      const blockType = typeof item.type === 'string' ? item.type.toLowerCase() : ''
+      
+      if (blockType === 'text' && typeof item.text === 'string') {
+        textParts.push(item.text)
+      } else if (blockType === 'thinking' && typeof item.thinking === 'string') {
+        result.thinking = item.thinking
+      } else if (['toolcall', 'tool_call', 'tooluse', 'tool_use'].includes(blockType)) {
+        result.toolCalls.push({
+          name: typeof item.name === 'string' ? item.name : 'tool',
+          args: typeof item.arguments === 'object' ? item.arguments as Record<string, unknown> : 
+                typeof item.args === 'object' ? item.args as Record<string, unknown> : undefined
+        })
+      } else if (['toolresult', 'tool_result'].includes(blockType)) {
+        result.toolResults.push({
+          name: typeof item.name === 'string' ? item.name : 'tool',
+          output: typeof item.text === 'string' ? item.text : 
+                  typeof item.content === 'string' ? item.content : undefined,
+          success: item.success !== false
+        })
+      }
+    }
+    
+    result.text = textParts.join('')
+    return result
+  }
 
   const handleBackendMessage = useCallback((message: { type: string; [key: string]: unknown }) => {
     switch (message.type) {
       case 'message':
-        const msgWithSender = message as unknown as ChatMessage & { clientId?: string }
+        const msgWithSender = message as unknown as ChatMessage & { 
+          clientId?: string;
+          content?: string | unknown[];
+        }
         const currentSessionId = getSessionId()
         
         if (msgWithSender.clientId === currentSessionId && msgWithSender.sender === 'user') {
@@ -216,7 +294,19 @@ export function useChat(userId = 'web-user') {
         
         if (isDuplicate) return
 
-        setMessages(prev => [...prev, msgWithSender])
+        const toolInfo = extractToolInfo(msgWithSender.content)
+        
+        const chatMessage: ChatMessage = {
+          type: msgWithSender.type,
+          sender: msgWithSender.sender,
+          content: toolInfo.text || (typeof msgWithSender.content === 'string' ? msgWithSender.content : ''),
+          timestamp: msgWithSender.timestamp,
+          toolCalls: toolInfo.toolCalls.length > 0 ? toolInfo.toolCalls : undefined,
+          toolResults: toolInfo.toolResults.length > 0 ? toolInfo.toolResults : undefined,
+          thinking: toolInfo.thinking || undefined
+        }
+        
+        setMessages(prev => [...prev, chatMessage])
   
         if (msgWithSender.sender === 'emily' && !isExpanded) {
           setHasNewMessage(true)
@@ -239,29 +329,6 @@ export function useChat(userId = 'web-user') {
         }, 3000)
         break
         
-      case 'stream':
-        const streamMsg = message as { chunk?: string; timestamp?: string }
-        setMessages(prev => {
-          const lastMessage = prev[prev.length - 1]
-          if (lastMessage && lastMessage.sender === 'emily' && lastMessage.isStreaming) {
-            const updated = [...prev]
-            updated[updated.length - 1] = {
-              ...lastMessage,
-              content: lastMessage.content + (streamMsg.chunk || ''),
-              timestamp: streamMsg.timestamp || new Date().toISOString()
-            }
-            return updated
-          }
-          return [...prev, {
-            type: 'message',
-            sender: 'emily',
-            content: streamMsg.chunk || '',
-            timestamp: streamMsg.timestamp || new Date().toISOString(),
-            isStreaming: true
-          }]
-        })
-        break
-        
       case 'error':
         const errorMsg = message as { content?: string; timestamp?: string }
         setMessages(prev => [...prev, {
@@ -274,15 +341,24 @@ export function useChat(userId = 'web-user') {
         break
         
       case 'history':
-        const historyMsg = message as { messages?: Array<{ role: string; content: string | unknown[]; timestamp?: string }> }
+        const historyMsg = message as { messages?: Array<{ 
+          role: string; 
+          content: string | unknown[]; 
+          timestamp?: string 
+        }> }
         if (historyMsg.messages && historyMsg.messages.length > 0) {
-          const formattedMessages: ChatMessage[] = historyMsg.messages.map(msg => ({
-            type: 'message',
-            sender: msg.role === 'assistant' ? 'emily' : 'user',
-            content: typeof msg.content === 'string' ? msg.content : 
-                     (Array.isArray(msg.content) ? msg.content.map(c => typeof c === 'object' && c && 'text' in c ? (c as { text: string }).text : '').join('') : '') || '',
-            timestamp: msg.timestamp || new Date().toISOString()
-          }))
+          const formattedMessages: ChatMessage[] = historyMsg.messages.map(msg => {
+            const toolInfo = extractToolInfo(msg.content)
+            return {
+              type: 'message',
+              sender: msg.role === 'assistant' ? 'emily' : 'user',
+              content: toolInfo.text || (typeof msg.content === 'string' ? msg.content : ''),
+              timestamp: msg.timestamp || new Date().toISOString(),
+              toolCalls: toolInfo.toolCalls.length > 0 ? toolInfo.toolCalls : undefined,
+              toolResults: toolInfo.toolResults.length > 0 ? toolInfo.toolResults : undefined,
+              thinking: toolInfo.thinking || undefined
+            }
+          })
           
           setMessages(formattedMessages)
         }
@@ -310,16 +386,6 @@ export function useChat(userId = 'web-user') {
   }, [connect])
 
   const sendMessage = useCallback((content: string) => {
-    if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
-      setMessages(prev => [...prev, {
-        type: 'error',
-        sender: 'system',
-        content: 'Not connected. Please enter your password.',
-        timestamp: new Date().toISOString()
-      }])
-      return false
-    }
-
     const sessionId = getSessionId()
     const timestamp = new Date().toISOString()
     
@@ -335,22 +401,33 @@ export function useChat(userId = 'web-user') {
     setMessages(prev => [...prev, userMessage])
     broadcast('message', userMessage)
 
-    wsRef.current.send(JSON.stringify({
+    const messagePayload = JSON.stringify({
       type: 'message',
       content,
       timestamp,
       clientId: sessionId
-    }))
+    })
+
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      wsRef.current.send(messagePayload)
+    } else if (connectionStatus === 'disconnected') {
+      pendingMessagesRef.current.push(messagePayload)
+      connect()
+    } else {
+      pendingMessagesRef.current.push(messagePayload)
+    }
+    
     return true
-  }, [broadcast, getSessionId])
+  }, [broadcast, getSessionId, connectionStatus, connect])
 
   const clearChat = useCallback(() => {
     setMessages([])
+    clearCachedMessages()
     broadcast('clear', {})
   }, [broadcast])
 
   const fetchHistory = useCallback(() => {
-    if (!isConnected || !wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
+    if (connectionStatus !== 'connected' || !wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
       console.log('[Chat] Cannot fetch history - not connected')
       return false
     }
@@ -362,26 +439,60 @@ export function useChat(userId = 'web-user') {
       data: { limit: 50 }
     }))
     return true
-  }, [isConnected])
+  }, [connectionStatus])
 
   const toggleExpanded = useCallback(() => {
-    setIsExpanded(prev => {
-      const newState = !prev
-      if (newState) {
-        setHasNewMessage(false)
-      }
-      return newState
-    })
+    setIsExpanded(prev => !prev)
   }, [])
 
   useEffect(() => {
-    if (getPassword() && !needsPassword) {
-      connect()
+    if (isExpanded) {
+      setHasNewMessage(false)
+      
+      if (disconnectTimeoutRef.current) {
+        clearTimeout(disconnectTimeoutRef.current)
+        disconnectTimeoutRef.current = null
+      }
+      
+      if (connectionStatus === 'disconnected' && getPassword() && !needsPassword) {
+        console.log('[Chat] Chat expanded, connecting...')
+        connect()
+      }
+    } else {
+      if (connectionStatus === 'connected') {
+        console.log(`[Chat] Chat minimized, will disconnect in ${DISCONNECT_DELAY/1000}s`)
+        disconnectTimeoutRef.current = setTimeout(() => {
+          if (!isExpanded) {
+            console.log('[Chat] Disconnecting due to inactivity')
+            disconnect()
+          }
+        }, DISCONNECT_DELAY)
+      }
     }
 
     return () => {
+      if (disconnectTimeoutRef.current) {
+        clearTimeout(disconnectTimeoutRef.current)
+      }
+    }
+  }, [isExpanded, connectionStatus, connect, disconnect, getPassword, needsPassword])
+
+  useEffect(() => {
+    if (connectionStatus === 'connected') {
+      const timeoutId = setTimeout(() => {
+        fetchHistory()
+      }, 500)
+      return () => clearTimeout(timeoutId)
+    }
+  }, [connectionStatus, fetchHistory])
+
+  useEffect(() => {
+    return () => {
       if (reconnectTimeoutRef.current) {
         clearTimeout(reconnectTimeoutRef.current)
+      }
+      if (disconnectTimeoutRef.current) {
+        clearTimeout(disconnectTimeoutRef.current)
       }
       if (wsRef.current) {
         wsRef.current.close()
@@ -389,29 +500,10 @@ export function useChat(userId = 'web-user') {
     }
   }, [])
 
-  useEffect(() => {
-    if (isConnected) {
-      const timeoutId = setTimeout(() => {
-        fetchHistory()
-      }, 500)
-      return () => clearTimeout(timeoutId)
-    }
-  }, [isConnected, fetchHistory])
-
-  useEffect(() => {
-    if (!isConnected || !isExpanded) return
-    
-    const intervalId = setInterval(() => {
-      console.log('[Chat] Auto-refreshing history...')
-      fetchHistory()
-    }, 120000)
-    
-    return () => clearInterval(intervalId)
-  }, [isConnected, isExpanded, fetchHistory])
-
   return {
     messages,
-    isConnected,
+    connectionStatus,
+    isConnected: connectionStatus === 'connected',
     isTyping,
     isExpanded,
     hasNewMessage,
@@ -422,6 +514,8 @@ export function useChat(userId = 'web-user') {
     setIsExpanded,
     setPassword,
     hasPassword,
-    fetchHistory
+    fetchHistory,
+    connect,
+    disconnect
   }
 }

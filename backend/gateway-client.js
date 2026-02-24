@@ -134,6 +134,43 @@ class GatewayClient {
         }
       }
       
+      // Filter out code-like content (minified JS, React bundles, etc.)
+      if (text && text.length > 500) {
+        const codePatterns = [
+          /\.exports\s*=/,
+          /function\s*\([a-z,]+\)\s*\{/i,
+          /return\s+[a-z]+\([a-z,]+\)/i,
+          /\{[a-z]+:[a-z]+\}/i,
+          /useEffect|useState|useRef|useCallback|createElement/,
+          /\.prototype\s*=/,
+          /Object\.defineProperty/,
+          /__webpack_require__|__esModule/,
+          /require\(['"]/
+        ];
+        
+        const looksLikeCode = codePatterns.some(pattern => pattern.test(text));
+        if (looksLikeCode) {
+          console.log('[Gateway] Skipping code-like message (length:', text.length, ')');
+          return;
+        }
+      }
+      
+      // Filter out error messages
+      if (text && text.length < 300) {
+        const errorPatterns = [
+          /Cannot read/i,
+          /error:/i,
+          /failed/i,
+          /this model does not support/i
+        ];
+        
+        const looksLikeError = errorPatterns.some(pattern => pattern.test(text));
+        if (looksLikeError) {
+          console.log('[Gateway] Skipping error message:', text.substring(0, 50));
+          return;
+        }
+      }
+      
       console.log('[Gateway] Extracted chat text:', text?.substring(0, 100));
       
       // Broadcast to all clients

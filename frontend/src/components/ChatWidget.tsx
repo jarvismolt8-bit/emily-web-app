@@ -1,18 +1,23 @@
 import { useState, useRef, useEffect } from 'react'
+import ReactMarkdown from 'react-markdown'
 import { useChat } from '../hooks/useChat'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { cn } from '@/lib/utils'
-import { MessageCircle, X, Send, RefreshCw, Trash2, Minus, Lock } from 'lucide-react'
+import { MessageCircle, X, Send, RefreshCw, Trash2, Minus, Lock, Loader2, MoreHorizontal, Plus, ListTodo, BarChart3, HelpCircle } from 'lucide-react'
+import { ToolCard, ThinkingCard } from './ToolCard'
+import type { ToolCall, ToolResult } from '@/lib/storage'
 
 interface ChatMessageData {
   type: string
   sender: 'user' | 'emily' | 'system' | 'error'
   content: string
   timestamp: string
-  isStreaming?: boolean
+  toolCalls?: ToolCall[]
+  toolResults?: ToolResult[]
+  thinking?: string
 }
 
 interface MessageBubbleProps {
@@ -29,26 +34,10 @@ const MessageBubble = ({ message }: MessageBubbleProps) => {
     })
   }
 
-  const renderContent = (content: string) => {
-    if (!content) return null
-    const urlRegex = /(https?:\/\/[^\s]+)/g
-    const parts = content.split(urlRegex)
-    return parts.map((part, index) => {
-      if (urlRegex.test(part)) {
-        return (
-          <a key={index} href={part} target="_blank" rel="noopener noreferrer" className="underline">
-            {part}
-          </a>
-        )
-      }
-      return <span key={index}>{part}</span>
-    })
-  }
-
   if (message.sender === 'system') {
     return (
       <div className="text-center py-2">
-        <p className="text-muted-foreground text-xs italic">{renderContent(message.content)}</p>
+        <p className="text-muted-foreground text-xs italic">{message.content}</p>
       </div>
     )
   }
@@ -56,7 +45,7 @@ const MessageBubble = ({ message }: MessageBubbleProps) => {
   if (message.sender === 'error') {
     return (
       <div className="text-center py-2">
-        <p className="text-destructive text-xs">{renderContent(message.content)}</p>
+        <p className="text-destructive text-xs">{message.content}</p>
       </div>
     )
   }
@@ -66,17 +55,45 @@ const MessageBubble = ({ message }: MessageBubbleProps) => {
   return (
     <div className={cn('flex items-end gap-2', isUser ? 'justify-end' : 'justify-start')}>
       {!isUser && (
-        <Avatar className="h-8 w-8 flex-shrink-0">
-          <AvatarFallback className="bg-muted text-sm">🥖</AvatarFallback>
+        <Avatar className="h-7 w-7 flex-shrink-0">
+          <AvatarFallback className="bg-muted text-xs">🥖</AvatarFallback>
         </Avatar>
       )}
       <div className={cn(
-        'max-w-[75%] rounded-2xl px-3 py-2',
+        'max-w-[85%] rounded-2xl px-3 py-2 overflow-hidden',
         isUser 
           ? 'bg-primary text-primary-foreground rounded-br-md' 
           : 'bg-muted rounded-bl-md'
       )}>
-        <p className="text-sm whitespace-pre-wrap break-words">{renderContent(message.content)}</p>
+        {message.thinking && (
+          <ThinkingCard thinking={message.thinking} />
+        )}
+        
+        {message.toolCalls && message.toolCalls.map((tool, idx) => (
+          <ToolCard 
+            key={`call-${idx}`}
+            kind="call" 
+            name={tool.name} 
+            args={tool.args} 
+          />
+        ))}
+        
+        {message.toolResults && message.toolResults.map((tool, idx) => (
+          <ToolCard 
+            key={`result-${idx}`}
+            kind="result" 
+            name={tool.name} 
+            output={tool.output}
+            success={tool.success}
+          />
+        ))}
+        
+        {message.content && (
+          <div className="text-sm break-words overflow-hidden">
+            <ReactMarkdown className="break-words">{message.content}</ReactMarkdown>
+          </div>
+        )}
+        
         {message.timestamp && (
           <p className={cn('text-[10px] mt-1', isUser ? 'text-primary-foreground/70' : 'text-muted-foreground')}>
             {formatTime(message.timestamp)}
@@ -87,10 +104,10 @@ const MessageBubble = ({ message }: MessageBubbleProps) => {
   )
 }
 
-function ChatWidget({ desktopMode = false }: { desktopMode?: boolean }) {
+function ChatWidget() {
   const {
     messages,
-    isConnected,
+    connectionStatus,
     isTyping,
     isExpanded,
     hasNewMessage,
@@ -106,33 +123,34 @@ function ChatWidget({ desktopMode = false }: { desktopMode?: boolean }) {
   const [inputValue, setInputValue] = useState('')
   const [passwordInput, setPasswordInput] = useState('')
   const [isMobile, setIsMobile] = useState(false)
+  const [showQuickActions, setShowQuickActions] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const messagesContainerRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const passwordInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
-    const checkMobile = () => setIsMobile(window.innerWidth <= 768)
+    const checkMobile = () => setIsMobile(window.innerWidth < 1024)
     checkMobile()
     window.addEventListener('resize', checkMobile)
     return () => window.removeEventListener('resize', checkMobile)
   }, [])
 
   useEffect(() => {
-    if ((desktopMode || isExpanded) && messagesEndRef.current) {
+    if (isExpanded && messagesEndRef.current) {
       messagesEndRef.current.scrollIntoView({ behavior: 'smooth' })
     }
-  }, [messages, isTyping, isExpanded, desktopMode])
+  }, [messages, isTyping, isExpanded])
 
   useEffect(() => {
-    if (desktopMode || isExpanded) {
+    if (isExpanded) {
       if (needsPassword && passwordInputRef.current) {
         setTimeout(() => passwordInputRef.current?.focus(), 100)
       } else if (textareaRef.current) {
         setTimeout(() => textareaRef.current?.focus(), 100)
       }
     }
-  }, [isExpanded, needsPassword, desktopMode])
+  }, [isExpanded, needsPassword])
 
   const handlePasswordSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -165,14 +183,6 @@ function ChatWidget({ desktopMode = false }: { desktopMode?: boolean }) {
     textarea.style.height = Math.min(textarea.scrollHeight, 120) + 'px'
   }
 
-  const quickActions = [
-    { label: '+ Expense', action: () => handleQuickAction('Add expense ') },
-    { label: '+ Task', action: () => handleQuickAction('Add task ') },
-    { label: '📊 Summary', action: () => handleQuickAction("Show me today's summary") },
-    { label: '📋 Tasks', action: () => handleQuickAction('List my tasks') },
-    { label: '❓ Help', action: () => handleQuickAction('What can you do?') }
-  ]
-
   const handleQuickAction = (text: string) => {
     if (needsPassword) return
     setInputValue(text)
@@ -186,6 +196,32 @@ function ChatWidget({ desktopMode = false }: { desktopMode?: boolean }) {
   }
 
   const handleMinimize = () => setIsExpanded(false)
+
+  const getConnectionIndicator = () => {
+    switch (connectionStatus) {
+      case 'connected':
+        return (
+          <>
+            <span className="w-2 h-2 rounded-full bg-green-500" />
+            <span className="text-xs text-muted-foreground">Online</span>
+          </>
+        )
+      case 'connecting':
+        return (
+          <>
+            <Loader2 className="w-3 h-3 animate-spin text-yellow-500" />
+            <span className="text-xs text-muted-foreground">Connecting...</span>
+          </>
+        )
+      case 'disconnected':
+        return (
+          <>
+            <span className="w-2 h-2 rounded-full bg-red-500" />
+            <span className="text-xs text-muted-foreground">Offline</span>
+          </>
+        )
+    }
+  }
 
   const renderPasswordScreen = () => (
     <div className="flex-1 flex items-center justify-center p-4 overflow-auto">
@@ -205,40 +241,84 @@ function ChatWidget({ desktopMode = false }: { desktopMode?: boolean }) {
             placeholder="Enter password..."
             value={passwordInput}
             onChange={(e) => setPasswordInput(e.target.value)}
-            className="flex-1"
+            className="flex-1 text-base h-10"
           />
-          <Button type="submit" disabled={!passwordInput.trim()}>Connect</Button>
+          <Button type="submit" disabled={!passwordInput.trim()} className="h-10">Connect</Button>
         </form>
       </div>
     </div>
   )
 
-  const renderHeader = (showMinimize: boolean) => (
+  const renderHeader = () => (
     <div className="flex items-center justify-between p-3 border-b flex-shrink-0">
       <div className="flex items-center gap-2">
-        <Avatar className="h-9 w-9">
-          <AvatarFallback className="bg-muted">🥖</AvatarFallback>
+        <Avatar className="h-8 w-8">
+          <AvatarFallback className="bg-muted text-sm">🥖</AvatarFallback>
         </Avatar>
         <div>
           <p className="font-semibold text-sm">Emily</p>
           <div className="flex items-center gap-1.5">
-            <span className={cn('w-2 h-2 rounded-full', isConnected ? 'bg-green-500' : 'bg-red-500')} />
-            <span className="text-xs text-muted-foreground">{isConnected ? 'Online' : 'Connecting...'}</span>
+            {getConnectionIndicator()}
           </div>
         </div>
       </div>
-      <div className="flex items-center gap-1">
-        <Button variant="ghost" size="icon" onClick={fetchHistory} title="Sync">
-          <RefreshCw className="h-4 w-4" />
+      <div className="flex items-center gap-1 relative">
+        <Button 
+          variant="ghost" 
+          size="icon" 
+          title="Quick Actions" 
+          type="button"
+          onClick={() => setShowQuickActions(!showQuickActions)}
+        >
+          <MoreHorizontal className="h-4 w-4" />
+        </Button>
+        {showQuickActions && (
+          <div className="absolute right-0 top-full mt-1 w-48 bg-popover border rounded-md shadow-lg z-[100] py-1">
+            <button
+              onClick={() => { handleQuickAction('Add task '); setShowQuickActions(false) }}
+              className="w-full px-3 py-2 text-sm text-left hover:bg-accent flex items-center gap-2"
+            >
+              <Plus className="h-4 w-4" />
+              Add Task
+            </button>
+            <button
+              onClick={() => { handleQuickAction("Show me today's summary"); setShowQuickActions(false) }}
+              className="w-full px-3 py-2 text-sm text-left hover:bg-accent flex items-center gap-2"
+            >
+              <BarChart3 className="h-4 w-4" />
+              Summary
+            </button>
+            <button
+              onClick={() => { handleQuickAction('List my tasks'); setShowQuickActions(false) }}
+              className="w-full px-3 py-2 text-sm text-left hover:bg-accent flex items-center gap-2"
+            >
+              <ListTodo className="h-4 w-4" />
+              View Tasks
+            </button>
+            <button
+              onClick={() => { handleQuickAction('What can you do?'); setShowQuickActions(false) }}
+              className="w-full px-3 py-2 text-sm text-left hover:bg-accent flex items-center gap-2"
+            >
+              <HelpCircle className="h-4 w-4" />
+              Help
+            </button>
+          </div>
+        )}
+        <Button 
+          variant="ghost" 
+          size="icon" 
+          onClick={fetchHistory} 
+          title="Sync"
+          disabled={connectionStatus !== 'connected'}
+        >
+          <RefreshCw className={cn("h-4 w-4", connectionStatus === 'connecting' && "animate-spin")} />
         </Button>
         <Button variant="ghost" size="icon" onClick={handleClearChat} title="Clear">
           <Trash2 className="h-4 w-4" />
         </Button>
-        {showMinimize && (
-          <Button variant="ghost" size="icon" onClick={handleMinimize} title="Minimize">
-            {isMobile ? <X className="h-4 w-4" /> : <Minus className="h-4 w-4" />}
-          </Button>
-        )}
+        <Button variant="ghost" size="icon" onClick={handleMinimize} title="Minimize">
+          {isMobile ? <X className="h-4 w-4" /> : <Minus className="h-4 w-4" />}
+        </Button>
       </div>
     </div>
   )
@@ -246,7 +326,7 @@ function ChatWidget({ desktopMode = false }: { desktopMode?: boolean }) {
   const renderMessages = () => (
     <div 
       ref={messagesContainerRef}
-      className="flex-1 overflow-y-auto p-4 space-y-3"
+      className="flex-1 overflow-y-auto overflow-x-hidden p-4 space-y-3 scrollbar-hide"
     >
       {messages.length === 0 && !needsPassword && (
         <div className="text-center text-muted-foreground text-sm py-8">
@@ -278,29 +358,12 @@ function ChatWidget({ desktopMode = false }: { desktopMode?: boolean }) {
     </div>
   )
 
-  const renderQuickActions = () => (
-    <div className="flex gap-1.5 overflow-x-auto p-3 border-t flex-shrink-0">
-      {quickActions.map((action, index) => (
-        <Button
-          key={index}
-          variant="outline"
-          size="sm"
-          onClick={action.action}
-          disabled={!isConnected}
-          className="whitespace-nowrap text-xs h-7"
-        >
-          {action.label}
-        </Button>
-      ))}
-    </div>
-  )
-
   const renderInputArea = () => (
     <div className="flex gap-2 p-3 border-t flex-shrink-0">
       <textarea
         ref={textareaRef}
-        className="flex-1 resize-none bg-muted rounded-md px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring min-h-[36px] max-h-[120px] placeholder:text-muted-foreground"
-        placeholder={isConnected ? 'Type a message...' : 'Connecting...'}
+        className="flex-1 resize-none bg-muted rounded-md px-3 py-2 text-base outline-none focus:ring-2 focus:ring-ring min-h-[40px] max-h-[120px] placeholder:text-muted-foreground"
+        placeholder={connectionStatus === 'connected' ? 'Type a message...' : 'Connecting...'}
         value={inputValue}
         onChange={(e) => {
           setInputValue(e.target.value)
@@ -308,49 +371,27 @@ function ChatWidget({ desktopMode = false }: { desktopMode?: boolean }) {
         }}
         onKeyDown={handleKeyDown}
         rows={1}
-        disabled={!isConnected}
+        disabled={connectionStatus !== 'connected'}
       />
-      <Button size="icon" onClick={handleSend} disabled={!inputValue.trim() || !isConnected} className="flex-shrink-0">
-        <Send className="h-4 w-4" />
+      <Button 
+        size="icon" 
+        onClick={handleSend} 
+        disabled={!inputValue.trim() || connectionStatus !== 'connected'} 
+        className="flex-shrink-0 h-10 w-10"
+      >
+        <Send className="h-5 w-5" />
       </Button>
     </div>
   )
 
-  if (desktopMode) {
-    return (
-      <Card className="h-screen rounded-none border-0 flex flex-col overflow-hidden">
-        {needsPassword ? (
-          <>
-            <div className="flex items-center gap-2 p-3 border-b flex-shrink-0">
-              <Avatar className="h-9 w-9">
-                <AvatarFallback className="bg-muted">🥖</AvatarFallback>
-              </Avatar>
-              <div>
-                <p className="font-semibold text-sm">Emily</p>
-                <div className="flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-red-500" />
-                  <span className="text-xs text-muted-foreground">Password Required</span>
-                </div>
-              </div>
-            </div>
-            {renderPasswordScreen()}
-          </>
-        ) : (
-          <>
-            {renderHeader(false)}
-            {renderMessages()}
-            {renderQuickActions()}
-            {renderInputArea()}
-          </>
-        )}
-      </Card>
-    )
-  }
-
   if (!isExpanded) {
     return (
       <div className="fixed bottom-4 right-4 z-50">
-        <Button size="icon" className="h-14 w-14 rounded-full shadow-lg" onClick={toggleExpanded}>
+        <Button 
+          size="icon" 
+          className="h-14 w-14 rounded-full shadow-lg bg-primary hover:bg-primary/90" 
+          onClick={toggleExpanded}
+        >
           <MessageCircle className="h-6 w-6" />
           {hasNewMessage && (
             <span className="absolute -top-1 -right-1 w-5 h-5 bg-destructive text-destructive-foreground text-xs rounded-full flex items-center justify-center font-bold">!</span>
@@ -363,14 +404,16 @@ function ChatWidget({ desktopMode = false }: { desktopMode?: boolean }) {
   return (
     <div className={cn(
       'fixed z-50 flex flex-col',
-      isMobile ? 'inset-0' : 'bottom-4 right-4 w-96 h-[650px] rounded-lg shadow-xl'
+      isMobile 
+        ? 'inset-0' 
+        : 'bottom-4 right-4 w-[420px] h-[700px] rounded-lg shadow-xl'
     )}>
-      <Card className="h-full flex flex-col overflow-hidden">
+      <Card className="h-full flex flex-col gap-0 py-0">
         {needsPassword ? (
           <>
             <div className="flex items-center gap-2 p-3 border-b flex-shrink-0">
-              <Avatar className="h-9 w-9">
-                <AvatarFallback className="bg-muted">🥖</AvatarFallback>
+              <Avatar className="h-8 w-8">
+                <AvatarFallback className="bg-muted text-sm">🥖</AvatarFallback>
               </Avatar>
               <div className="flex-1">
                 <p className="font-semibold text-sm">Emily</p>
@@ -387,9 +430,8 @@ function ChatWidget({ desktopMode = false }: { desktopMode?: boolean }) {
           </>
         ) : (
           <>
-            {renderHeader(true)}
+            {renderHeader()}
             {renderMessages()}
-            {renderQuickActions()}
             {renderInputArea()}
           </>
         )}

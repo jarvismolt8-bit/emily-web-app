@@ -107,70 +107,62 @@ export default function App() {
   return (
     <TooltipProvider>
       <div className="min-h-screen bg-background">
-        <div className="flex flex-col lg:flex-row">
-          <div className="flex-1">
-            <header className="sticky top-0 z-10 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-              <div className="flex h-14 items-center justify-between px-4 lg:px-6">
-                <div className="flex items-center gap-3">
-                  <span className="text-xl">🥖</span>
-                  <h1 className="text-base font-semibold">Emily's Web App</h1>
-                </div>
-                <div className="flex items-center gap-2">
-                  <ThemeToggle />
-                  <Button variant="ghost" size="sm" onClick={logout}>
-                    <LogOut className="h-4 w-4 mr-1.5" />
-                    Logout
-                  </Button>
-                </div>
+        <div className="flex flex-col">
+          <header className="sticky top-0 z-10 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+            <div className="flex h-14 items-center justify-between px-4 lg:px-6">
+              <div className="flex items-center gap-3">
+                <span className="text-xl">🥖</span>
+                <h1 className="text-base font-semibold">Emily's Web App</h1>
               </div>
-            </header>
-
-            <div className="flex flex-1 flex-col gap-6 p-4 md:p-6 lg:p-8">
-              <Tabs value={activeTab} onValueChange={setActiveTab}>
-                <TabsList>
-                  <TabsTrigger value="cashflow" className="gap-2">
-                    <Wallet className="h-4 w-4" />
-                    Cashflow
-                  </TabsTrigger>
-                  <TabsTrigger value="tasks" className="gap-2">
-                    <ListTodo className="h-4 w-4" />
-                    Tasks
-                  </TabsTrigger>
-                  <TabsTrigger value="logs" className="gap-2">
-                    <Activity className="h-4 w-4" />
-                    Logs
-                  </TabsTrigger>
-                </TabsList>
-
-                <TabsContent value="cashflow" className="mt-6 space-y-6">
-                  <SummaryCards summary={summary} />
-                  <FilterBar onFilterChange={handleFilterChange} />
-{loading ? (
-                     <div className="flex items-center justify-center py-12 text-muted-foreground">Loading...</div>
-                   ) : (
-                     <CashflowTable entries={entries} onDelete={handleDelete} sortBy={cashflowSortBy} sortOrder={cashflowSortOrder} onSort={handleCashflowSort} />
-                   )}
-                </TabsContent>
-
-                <TabsContent value="tasks" className="mt-6">
-                  <Tasks />
-                </TabsContent>
-
-                <TabsContent value="logs" className="mt-6">
-                  <ActivityLogs />
-                </TabsContent>
-              </Tabs>
+              <div className="flex items-center gap-2">
+                <ThemeToggle />
+                <Button variant="ghost" size="sm" onClick={logout}>
+                  <LogOut className="h-4 w-4 mr-1.5" />
+                  Logout
+                </Button>
+              </div>
             </div>
-          </div>
+          </header>
 
-          <div className="hidden lg:block lg:w-96 lg:border-l lg:sticky lg:top-0 lg:h-screen">
-            <ChatWidget desktopMode={true} />
+          <div className="flex flex-1 flex-col gap-6 p-4 md:p-6 lg:p-8">
+            <Tabs value={activeTab} onValueChange={setActiveTab}>
+              <TabsList>
+                <TabsTrigger value="cashflow" className="gap-2">
+                  <Wallet className="h-4 w-4" />
+                  Cashflow
+                </TabsTrigger>
+                <TabsTrigger value="tasks" className="gap-2">
+                  <ListTodo className="h-4 w-4" />
+                  Tasks
+                </TabsTrigger>
+                <TabsTrigger value="logs" className="gap-2">
+                  <Activity className="h-4 w-4" />
+                  Logs
+                </TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="cashflow" className="mt-6 space-y-6">
+                <SummaryCards summary={summary} />
+                <FilterBar onFilterChange={handleFilterChange} />
+                {loading ? (
+                  <div className="flex items-center justify-center py-12 text-muted-foreground">Loading...</div>
+                ) : (
+                  <CashflowTable entries={entries} onDelete={handleDelete} sortBy={cashflowSortBy} sortOrder={cashflowSortOrder} onSort={handleCashflowSort} />
+                )}
+              </TabsContent>
+
+              <TabsContent value="tasks" className="mt-6">
+                <Tasks />
+              </TabsContent>
+
+              <TabsContent value="logs" className="mt-6">
+                <ActivityLogs />
+              </TabsContent>
+            </Tabs>
           </div>
         </div>
 
-        <div className="lg:hidden">
-          <ChatWidget desktopMode={false} />
-        </div>
+        <ChatWidget />
       </div>
     </TooltipProvider>
   )

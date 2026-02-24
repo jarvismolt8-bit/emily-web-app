@@ -24,6 +24,7 @@ const activityLogsV1Routes = require('./routes/v1/activity-logs');
 const cashflowRepo = require('./repositories/cashflow.repository');
 const tasksRepo = require('./repositories/tasks.repository');
 const { logActivity } = require('./utils/activity-logger');
+const { logLoginAttempt } = require('./utils/security-logger');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -40,8 +41,10 @@ app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument, {
 const verifyPassword = (req, res, next) => {
   const authHeader = req.headers['x-password'];
   if (authHeader === WEB_PASSWORD) {
+    logLoginAttempt(req, true);
     next();
   } else {
+    logLoginAttempt(req, false);
     res.status(401).json({ error: 'Unauthorized' });
   }
 };
