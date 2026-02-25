@@ -14,13 +14,15 @@ const CATEGORY_EMOJIS: Record<string, string> = {
   'Investment': '📊',
   'investment': '📊',
   'Food': '🍔',
+  'Pet Food': '😺',
   'Transport': '🚗',
   'Utilities': '⚡',
   'Shopping': '🛒',
   'Entertainment': '🎬',
   'Health': '💊',
   'Airbnb': '🛌',
-  'Other': '📦'
+  'Other': '📦',
+  'Clothing': '👕'
 }
 
 const CURRENCY_SYMBOLS: Record<string, string> = {

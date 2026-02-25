@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { cn } from '@/lib/utils'
-import { MessageCircle, X, Send, RefreshCw, Trash2, Minus, Lock, Loader2, MoreHorizontal, Plus, ListTodo, BarChart3, HelpCircle } from 'lucide-react'
+import { MessageCircle, X, Send, RefreshCw, Trash2, Minus, Lock, Loader2, MoreHorizontal } from 'lucide-react'
 import { ToolCard, ThinkingCard } from './ToolCard'
 import type { ToolCall, ToolResult } from '@/lib/storage'
 
@@ -124,6 +124,8 @@ function ChatWidget() {
   const [passwordInput, setPasswordInput] = useState('')
   const [isMobile, setIsMobile] = useState(false)
   const [showQuickActions, setShowQuickActions] = useState(false)
+  const [verboseLevel, setVerboseLevel] = useState<'on' | 'off'>('off')
+  const [thinkLevel, setThinkLevel] = useState<'high' | 'medium' | 'low'>('medium')
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const messagesContainerRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -275,32 +277,68 @@ function ChatWidget() {
         {showQuickActions && (
           <div className="absolute right-0 top-full mt-1 w-48 bg-popover border rounded-md shadow-lg z-[100] py-1">
             <button
-              onClick={() => { handleQuickAction('Add task '); setShowQuickActions(false) }}
+              onClick={() => { sendMessage('/model'); setShowQuickActions(false) }}
               className="w-full px-3 py-2 text-sm text-left hover:bg-accent flex items-center gap-2"
             >
-              <Plus className="h-4 w-4" />
-              Add Task
+              <span className="font-mono">/model</span>
+              <span className="text-muted-foreground text-xs">Switch model</span>
             </button>
             <button
-              onClick={() => { handleQuickAction("Show me today's summary"); setShowQuickActions(false) }}
+              onClick={() => { sendMessage('/models'); setShowQuickActions(false) }}
               className="w-full px-3 py-2 text-sm text-left hover:bg-accent flex items-center gap-2"
             >
-              <BarChart3 className="h-4 w-4" />
-              Summary
+              <span className="font-mono">/models</span>
+              <span className="text-muted-foreground text-xs">List models</span>
             </button>
             <button
-              onClick={() => { handleQuickAction('List my tasks'); setShowQuickActions(false) }}
+              onClick={() => { sendMessage('/help'); setShowQuickActions(false) }}
               className="w-full px-3 py-2 text-sm text-left hover:bg-accent flex items-center gap-2"
             >
-              <ListTodo className="h-4 w-4" />
-              View Tasks
+              <span className="font-mono">/help</span>
+              <span className="text-muted-foreground text-xs">Show help</span>
             </button>
             <button
-              onClick={() => { handleQuickAction('What can you do?'); setShowQuickActions(false) }}
+              onClick={() => { sendMessage('/commands'); setShowQuickActions(false) }}
               className="w-full px-3 py-2 text-sm text-left hover:bg-accent flex items-center gap-2"
             >
-              <HelpCircle className="h-4 w-4" />
-              Help
+              <span className="font-mono">/commands</span>
+              <span className="text-muted-foreground text-xs">List commands</span>
+            </button>
+            <div className="h-px bg-border my-1" />
+            <button
+              onClick={() => { 
+                const newLevel = verboseLevel === 'on' ? 'off' : 'on'
+                setVerboseLevel(newLevel)
+                sendMessage(`/verbose ${newLevel}`)
+                setShowQuickActions(false) 
+              }}
+              className="w-full px-3 py-2 text-sm text-left hover:bg-accent flex items-center gap-2"
+            >
+              <span className="font-mono">/verbose</span>
+              <span className="text-xs px-1.5 py-0.5 rounded bg-muted">{verboseLevel}</span>
+            </button>
+            <button
+              onClick={() => { 
+                const levels: Array<'high' | 'medium' | 'low'> = ['high', 'medium', 'low']
+                const currentIndex = levels.indexOf(thinkLevel)
+                const nextIndex = (currentIndex + 1) % levels.length
+                const newLevel = levels[nextIndex]
+                setThinkLevel(newLevel)
+                sendMessage(`/think ${newLevel}`)
+                setShowQuickActions(false) 
+              }}
+              className="w-full px-3 py-2 text-sm text-left hover:bg-accent flex items-center gap-2"
+            >
+              <span className="font-mono">/think</span>
+              <span className="text-xs px-1.5 py-0.5 rounded bg-muted">{thinkLevel}</span>
+            </button>
+            <div className="h-px bg-border my-1" />
+            <button
+              onClick={() => { sendMessage('/code_agent'); setShowQuickActions(false) }}
+              className="w-full px-3 py-2 text-sm text-left hover:bg-accent flex items-center gap-2"
+            >
+              <span className="font-mono">/code_agent</span>
+              <span className="text-muted-foreground text-xs">Code mode</span>
             </button>
           </div>
         )}
