@@ -11,9 +11,6 @@
 		{
 			"name": ".openclaw",
 			"path": "../../../../root/.openclaw"
-		},
-		{
-			"path": "../../../log"
 		}
 	],
 	"settings": {}
