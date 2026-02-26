@@ -122,7 +122,7 @@ export default function TaskModal({ isOpen, onClose, onSave, onDelete, task }: T
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>{task ? 'Edit Task' : 'Add Task'}</DialogTitle>
+          <DialogTitle>{task ? `Edit Task #${task.id}` : 'Add Task'}</DialogTitle>
         </DialogHeader>
         
         <form onSubmit={handleSubmit}>
