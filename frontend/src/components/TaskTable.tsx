@@ -48,6 +48,8 @@ interface TaskTableProps {
   sortBy?: SortField | null
   sortOrder?: SortOrder
   onSort?: (field: SortField) => void
+  statusFilter?: string | null
+  onStatusFilter?: (status: string | null) => void
 }
 
 function SortIndicator({ field, currentField, currentOrder }: { field: SortField; currentField?: SortField | null; currentOrder?: SortOrder }) {
@@ -57,7 +59,26 @@ function SortIndicator({ field, currentField, currentOrder }: { field: SortField
   return <span className="ml-1">{currentOrder === 'asc' ? '▲' : '▼'}</span>
 }
 
-export default function TaskTable({ tasks, onEdit, onDelete, sortBy, sortOrder, onSort }: TaskTableProps) {
+const STATUS_ORDER = ['backlog', 'in_progress', 'done']
+
+function StatusIndicator({ status }: { status: string | null }) {
+  return <span className="ml-1 text-muted-foreground/50">▼</span>
+}
+
+export default function TaskTable({ tasks, onEdit, onDelete, sortBy, sortOrder, onSort, statusFilter, onStatusFilter }: TaskTableProps) {
+  const handleStatusFilter = () => {
+    if (!onStatusFilter) return
+    if (!statusFilter) {
+      onStatusFilter('backlog')
+    } else if (statusFilter === 'backlog') {
+      onStatusFilter('in_progress')
+    } else if (statusFilter === 'in_progress') {
+      onStatusFilter('done')
+    } else {
+      onStatusFilter(null)
+    }
+  }
+
   return (
     <div className="overflow-x-auto rounded-lg border">
       <Table>
@@ -71,7 +92,9 @@ export default function TaskTable({ tasks, onEdit, onDelete, sortBy, sortOrder, 
             <TableHead className="cursor-pointer select-none hover:text-foreground" onClick={() => onSort?.('date')}>
               Due<SortIndicator field="date" currentField={sortBy} currentOrder={sortOrder} />
             </TableHead>
-            <TableHead>Status</TableHead>
+            <TableHead className="cursor-pointer select-none hover:text-foreground" onClick={handleStatusFilter}>
+              Status<StatusIndicator status={statusFilter} />
+            </TableHead>
             <TableHead className="cursor-pointer select-none hover:text-foreground" onClick={() => onSort?.('priority')}>
               Priority<SortIndicator field="priority" currentField={sortBy} currentOrder={sortOrder} />
             </TableHead>

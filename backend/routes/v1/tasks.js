@@ -6,8 +6,8 @@ const { logActivityFromReq } = require('../../utils/activity-logger');
 
 router.get('/', (req, res) => {
   try {
-    const { sortBy, sortOrder } = req.query;
-    const tasks = tasksRepo.findAll({ sortBy, sortOrder });
+    const { sortBy, sortOrder, status } = req.query;
+    const tasks = tasksRepo.findAll({ sortBy, sortOrder, status });
     sendSuccess(res, tasks);
   } catch (error) {
     sendError(res, 'INTERNAL_ERROR', error.message, 500);

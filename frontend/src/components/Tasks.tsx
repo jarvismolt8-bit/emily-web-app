@@ -41,16 +41,21 @@ export default function Tasks({ showAddButton = true }: TasksProps) {
   const [sortBy, setSortBy] = useState<SortField | null>(null)
   const [sortOrder, setSortOrder] = useState<SortOrder>('desc')
   const [viewMode, setViewMode] = useState<ViewMode>('kanban')
+  const [statusFilter, setStatusFilter] = useState<string | null>(null)
 
   const fetchTasks = useCallback(async () => {
-    return tasksAPI.getAll(sortBy ? { sortBy, sortOrder } : undefined)
-  }, [sortBy, sortOrder])
+    return tasksAPI.getAll({ 
+      sortBy, 
+      sortOrder,
+      ...(statusFilter && { status: statusFilter })
+    })
+  }, [sortBy, sortOrder, statusFilter])
 
   const { data: tasks, loading, refresh: fetchTasksRefresh } = useRealtimeTasks(fetchTasks)
 
   useEffect(() => {
     fetchTasksRefresh()
-  }, [sortBy, sortOrder, fetchTasksRefresh])
+  }, [sortBy, sortOrder, statusFilter, fetchTasksRefresh])
 
   const handleSort = (field: SortField) => {
     if (sortBy === field) {
@@ -147,7 +152,9 @@ export default function Tasks({ showAddButton = true }: TasksProps) {
           onDelete={handleDelete} 
           sortBy={sortBy} 
           sortOrder={sortOrder} 
-          onSort={handleSort} 
+          onSort={handleSort}
+          statusFilter={statusFilter}
+          onStatusFilter={setStatusFilter}
         />
       ) : (
         <TaskKanban 

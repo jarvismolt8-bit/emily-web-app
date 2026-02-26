@@ -22,6 +22,7 @@ async function unwrapResponse<T>(response: Response): Promise<T> {
 interface TaskFilters {
   sortBy?: 'id' | 'date' | 'priority'
   sortOrder?: 'asc' | 'desc'
+  status?: string
 }
 
 interface Task {

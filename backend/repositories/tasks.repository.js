@@ -4,9 +4,17 @@ const eventBus = require('../events');
 const PRIORITY_ORDER = { high: 0, medium: 1, low: 2 };
 
 const tasksRepo = {
-  findAll({ sortBy, sortOrder } = {}) {
+  findAll({ sortBy, sortOrder, status } = {}) {
     const db = getDb();
     let sql = 'SELECT * FROM tasks';
+    const params = [];
+
+    if (status) {
+      const statusList = status.split(',').map(s => s.trim());
+      const placeholders = statusList.map(() => '?').join(', ');
+      sql += ` WHERE status IN (${placeholders})`;
+      params.push(...statusList);
+    }
 
     if (sortBy === 'id') {
       sql += ` ORDER BY CAST(id AS INTEGER) ${sortOrder === 'desc' ? 'DESC' : 'ASC'}`;
@@ -18,7 +26,7 @@ const tasksRepo = {
       sql += ` ORDER BY CASE priority WHEN 'high' THEN 0 WHEN 'medium' THEN 1 WHEN 'low' THEN 2 ELSE 1 END ASC`;
     }
 
-    return db.prepare(sql).all();
+    return db.prepare(sql).all(...params);
   },
 
   findById(id) {
