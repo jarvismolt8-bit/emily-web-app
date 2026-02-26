@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import { Routes, Route, Navigate } from 'react-router-dom'
 import { useAuth } from './hooks/useAuth'
 import PasswordGate from './components/PasswordGate'
 import SummaryCards from './components/SummaryCards'
@@ -6,13 +7,14 @@ import FilterBar from './components/FilterBar'
 import CashflowTable from './components/CashflowTable'
 import Tasks from './components/Tasks'
 import ActivityLogs from './components/ActivityLogs'
+import ImageRenamer from './components/ImageRenamer'
 import ChatWidget from './components/ChatWidget'
 import { cashflowAPI } from './api/cashflow'
 import { useRealtimeCashflow } from './hooks/useRealtimeData'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
 import { ThemeToggle } from './components/ThemeToggle'
-import { LogOut, Wallet, ListTodo, Activity } from 'lucide-react'
+import { LogOut, Wallet, ListTodo, Activity, Image } from 'lucide-react'
 import { TooltipProvider } from '@/components/ui/tooltip'
 
 interface Filters {
@@ -42,8 +44,8 @@ interface Summary {
   transactionCount: number
 }
 
-export default function App() {
-  const { isAuthenticated, login, logout } = useAuth()
+function CashflowApp() {
+  const { logout } = useAuth()
   const [activeTab, setActiveTab] = useState('cashflow')
   const [summary, setSummary] = useState<Summary>({ totalIncome: 0, totalExpenses: 0, balance: 0, transactionCount: 0 })
   const [filters, setFilters] = useState<Filters>({ category: 'All', currency: 'All', search: '' })
@@ -60,16 +62,12 @@ export default function App() {
   const { data: entries, loading, refresh } = useRealtimeCashflow(fetchCashflow)
 
   useEffect(() => {
-    if (isAuthenticated) {
-      cashflowAPI.getSummary().then(setSummary).catch(console.error)
-    }
-  }, [isAuthenticated, entries])
+    cashflowAPI.getSummary().then(setSummary).catch(console.error)
+  }, [entries])
 
   useEffect(() => {
-    if (isAuthenticated) {
-      refresh()
-    }
-  }, [isAuthenticated, filters, cashflowSortBy, cashflowSortOrder, refresh])
+    refresh()
+  }, [filters, cashflowSortBy, cashflowSortOrder, refresh])
 
   const handleFilterChange = (newFilters: Filters) => {
     setFilters(newFilters)
@@ -98,10 +96,6 @@ export default function App() {
         console.error('Error deleting entry:', error)
       }
     }
-  }
-
-  if (!isAuthenticated) {
-    return <PasswordGate onAuth={login} />
   }
 
   return (
@@ -165,5 +159,21 @@ export default function App() {
         <ChatWidget />
       </div>
     </TooltipProvider>
+  )
+}
+
+export default function App() {
+  const { isAuthenticated, login } = useAuth()
+
+  if (!isAuthenticated) {
+    return <PasswordGate onAuth={login} />
+  }
+
+  return (
+    <Routes>
+      <Route path="/" element={<CashflowApp />} />
+      <Route path="/image-renamer" element={<ImageRenamer />} />
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
   )
 }

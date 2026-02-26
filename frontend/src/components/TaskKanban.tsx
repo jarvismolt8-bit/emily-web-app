@@ -22,6 +22,7 @@ import {
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 
 type TaskStatus = 'backlog' | 'in_progress' | 'done'
 

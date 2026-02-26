@@ -20,6 +20,7 @@ const sourceMiddleware = require('./middleware/source');
 const cashflowV1Routes = require('./routes/v1/cashflow');
 const tasksV1Routes = require('./routes/v1/tasks');
 const activityLogsV1Routes = require('./routes/v1/activity-logs');
+const imageRenamerRoutes = require('./routes/image-renamer');
 
 const cashflowRepo = require('./repositories/cashflow.repository');
 const tasksRepo = require('./repositories/tasks.repository');
@@ -31,7 +32,8 @@ const PORT = process.env.PORT || 3001;
 const WEB_PASSWORD = process.env.WEB_PASSWORD;
 
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument, {
   customCss: '.swagger-ui .topbar { display: none }',
@@ -52,6 +54,8 @@ const verifyPassword = (req, res, next) => {
 app.use('/api/v1/cashflow', verifyPassword, sourceMiddleware, cashflowV1Routes);
 app.use('/api/v1/tasks', verifyPassword, sourceMiddleware, tasksV1Routes);
 app.use('/api/v1/activity-logs', verifyPassword, sourceMiddleware, activityLogsV1Routes);
+
+app.use('/api/image-renamer', verifyPassword, imageRenamerRoutes);
 
 const deprecationWarning = (req, res, next) => {
   console.log(`[DEPRECATED] ${req.method} ${req.path} - Use /api/v1${req.path.replace('/api', '')} instead`);
