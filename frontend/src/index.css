@@ -1,5 +1,6 @@
 @import url('https://fonts.googleapis.com/css2?family=Geist:wght@100..900&family=Geist+Mono:wght@100..700&display=swap');
 @import "tailwindcss";
+@plugin "@tailwindcss/typography";
 
 @theme inline {
   --font-sans: 'Geist', ui-sans-serif, system-ui, sans-serif;
@@ -87,19 +88,21 @@ body {
   background-color: var(--background);
   color: var(--foreground);
   font-family: var(--font-sans);
-  padding: 1.5rem;
+  padding: 0;
 }
 
-@media (min-width: 768px) {
-  body {
-    padding: 2rem;
-  }
-}
-
-input[type="date"]::-webkit-calendar-picker-indicator {
+input[type="date"]::-webkit-calendar-picker-indicator,
+input[type="datetime-local"]::-webkit-calendar-picker-indicator {
   cursor: pointer;
+  opacity: 0.5;
 }
 
-.dark input[type="date"]::-webkit-calendar-picker-indicator {
+input[type="date"]::-webkit-calendar-picker-indicator:hover,
+input[type="datetime-local"]::-webkit-calendar-picker-indicator:hover {
+  opacity: 1;
+}
+
+.dark input[type="date"]::-webkit-calendar-picker-indicator,
+.dark input[type="datetime-local"]::-webkit-calendar-picker-indicator {
   filter: invert(0.7);
 }

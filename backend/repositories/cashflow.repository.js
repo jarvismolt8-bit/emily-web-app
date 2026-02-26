@@ -100,9 +100,7 @@ const cashflowRepo = {
     );
     const entry = this.findById(id);
     
-    if (source !== 'web_app') {
-      eventBus.emit('cashflow:created', { data: entry, source, timestamp: new Date().toISOString() });
-    }
+    eventBus.emit('cashflow:created', { data: entry, source, timestamp: new Date().toISOString() });
     
     return entry;
   },
@@ -122,9 +120,7 @@ const cashflowRepo = {
     );
     const entry = this.findById(id);
     
-    if (source !== 'web_app') {
-      eventBus.emit('cashflow:updated', { data: entry, source, timestamp: new Date().toISOString() });
-    }
+    eventBus.emit('cashflow:updated', { data: entry, source, timestamp: new Date().toISOString() });
     
     return entry;
   },
@@ -134,9 +130,7 @@ const cashflowRepo = {
     if (!existing) return null;
     getDb().prepare('DELETE FROM cashflow WHERE id = ?').run(id);
     
-    if (source !== 'web_app') {
-      eventBus.emit('cashflow:deleted', { data: existing, source, timestamp: new Date().toISOString() });
-    }
+    eventBus.emit('cashflow:deleted', { data: existing, source, timestamp: new Date().toISOString() });
     
     return existing;
   }

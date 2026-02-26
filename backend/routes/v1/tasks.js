@@ -3,6 +3,77 @@ const router = express.Router();
 const { sendSuccess, sendError } = require('../../middleware/response');
 const tasksRepo = require('../../repositories/tasks.repository');
 const { logActivityFromReq } = require('../../utils/activity-logger');
+const fs = require('fs');
+const path = require('path');
+
+const DOCS_DIR = path.join(__dirname, '../../../documentation');
+
+function getDocFilePath(taskId) {
+  return path.join(DOCS_DIR, `${taskId}-improve-task.md`);
+}
+
+router.get('/:id/documentation', (req, res) => {
+  try {
+    const task = tasksRepo.findById(req.params.id);
+    if (!task) {
+      return sendError(res, 'RESOURCE_NOT_FOUND', 'Task not found', 404);
+    }
+
+    const docPath = getDocFilePath(req.params.id);
+    
+    if (fs.existsSync(docPath)) {
+      const content = fs.readFileSync(docPath, 'utf8');
+      sendSuccess(res, { content, exists: true });
+    } else {
+      sendSuccess(res, { content: '', exists: false });
+    }
+  } catch (error) {
+    sendError(res, 'INTERNAL_ERROR', error.message, 500);
+  }
+});
+
+router.post('/:id/documentation', (req, res) => {
+  try {
+    const task = tasksRepo.findById(req.params.id);
+    if (!task) {
+      return sendError(res, 'RESOURCE_NOT_FOUND', 'Task not found', 404);
+    }
+
+    const { content } = req.body;
+    if (!content) {
+      return sendError(res, 'VALIDATION_ERROR', 'Content is required', 400);
+    }
+
+    const docPath = getDocFilePath(req.params.id);
+    const today = new Date().toLocaleDateString('en-US', { 'month': 'short', 'day': '2-digit', 'year': 'numeric' });
+    
+    let finalContent = content;
+    
+    if (fs.existsSync(docPath)) {
+      const existing = fs.readFileSync(docPath, 'utf8');
+      const updatedMatch = existing.match(/^\*\*Updated:\*\* .+$/m);
+      if (updatedMatch) {
+        finalContent = content.replace(/^\*\*Updated:\*\* .+$/m, `**Updated:** ${today}`);
+      }
+    } else {
+      finalContent = content.replace(/^\*\*Updated:\*\* .+$/m, `**Updated:** ${today}`);
+    }
+
+    fs.writeFileSync(docPath, finalContent, 'utf8');
+
+    logActivityFromReq(
+      req,
+      'task_documentation_update',
+      `Updated documentation for task ${req.params.id}`,
+      { task_id: req.params.id },
+      'success'
+    );
+
+    sendSuccess(res, { path: docPath }, 'Documentation updated');
+  } catch (error) {
+    sendError(res, 'INTERNAL_ERROR', error.message, 500);
+  }
+});
 
 router.get('/', (req, res) => {
   try {
