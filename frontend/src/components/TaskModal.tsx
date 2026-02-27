@@ -186,7 +186,7 @@ export default function TaskModal({ isOpen, onClose, onSave, onDelete, task }: T
                 value={formData.description}
                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                 placeholder="Add details about this task..."
-                className="mt-2 min-h-[100px]"
+                className="mt-2 min-h-[200px]"
                 rows={3}
               />
             </div>

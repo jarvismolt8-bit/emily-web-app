@@ -9,7 +9,18 @@ const path = require('path');
 const DOCS_DIR = path.join(__dirname, '../../../documentation');
 
 function getDocFilePath(taskId) {
-  return path.join(DOCS_DIR, `${taskId}-improve-task.md`);
+  const basePath = path.join(DOCS_DIR, `${taskId}-improve-task.md`);
+  if (fs.existsSync(basePath)) {
+    return basePath;
+  }
+  
+  const files = fs.readdirSync(DOCS_DIR);
+  const matchingFile = files.find(f => f.startsWith(`${taskId}-`) && f.endsWith('.md'));
+  if (matchingFile) {
+    return path.join(DOCS_DIR, matchingFile);
+  }
+  
+  return basePath;
 }
 
 router.get('/:id/documentation', (req, res) => {

@@ -44,3 +44,4 @@
 - Feb 26 2026 10:59am: Modified cashflow.repository.js to emit events for all sources
 - Feb 26 2026 11:00am: Restarted backend server
 - Feb 26 2026 11:00am: Tested API - SSE should now work for cashflow
+- Feb 26 2026 11:05am: Fixed documentation lookup - API now finds MD files by task ID prefix
