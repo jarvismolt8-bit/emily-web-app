@@ -94,7 +94,7 @@ export default function ActivityLogTable({ logs }: ActivityLogTableProps) {
                   </span>
                 </TableCell>
                 <TableCell>
-                  <div className="max-w-xs truncate">{log.description}</div>
+                  <div className="whitespace-normal">{log.description}</div>
                   {log.error_message && (
                     <div className="text-xs text-rose-500 truncate">
                       {log.error_message}
