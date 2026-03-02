@@ -104,21 +104,29 @@ const MessageBubble = ({ message }: MessageBubbleProps) => {
   )
 }
 
-function ChatWidget() {
+interface ChatWidgetProps {
+  isExpanded?: boolean
+  setIsExpanded?: (expanded: boolean) => void
+}
+
+function ChatWidget({ isExpanded: externalIsExpanded, setIsExpanded: externalSetIsExpanded }: ChatWidgetProps) {
   const {
     messages,
     connectionStatus,
     isTyping,
-    isExpanded,
+    isExpanded: internalIsExpanded,
     hasNewMessage,
     needsPassword,
     sendMessage,
     clearChat,
     toggleExpanded,
-    setIsExpanded,
+    setIsExpanded: internalSetIsExpanded,
     setPassword,
     fetchHistory
   } = useChat('web-user')
+
+  const isExpanded = externalIsExpanded !== undefined ? externalIsExpanded : internalIsExpanded
+  const setIsExpanded = externalSetIsExpanded || internalSetIsExpanded
 
   const [inputValue, setInputValue] = useState('')
   const [passwordInput, setPasswordInput] = useState('')
@@ -423,20 +431,7 @@ function ChatWidget() {
   )
 
   if (!isExpanded) {
-    return (
-      <div className="fixed bottom-4 right-4 z-50">
-        <Button 
-          size="icon" 
-          className="h-14 w-14 rounded-full shadow-lg bg-primary hover:bg-primary/90" 
-          onClick={toggleExpanded}
-        >
-          <MessageCircle className="h-6 w-6" />
-          {hasNewMessage && (
-            <span className="absolute -top-1 -right-1 w-5 h-5 bg-destructive text-destructive-foreground text-xs rounded-full flex items-center justify-center font-bold">!</span>
-          )}
-        </Button>
-      </div>
-    )
+    return null
   }
 
   return (

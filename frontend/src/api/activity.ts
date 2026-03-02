@@ -26,6 +26,17 @@ interface ActivityLogParams {
   source?: string
   date_from?: string
   date_to?: string
+  limit?: number
+  offset?: number
+}
+
+interface ActivityLogsData {
+  logs: ActivityLog[]
+  total_count: number
+  limit: number
+  offset: number
+  has_more: boolean
+  last_cleanup: string | null
 }
 
 interface ActivityLog {
@@ -66,7 +77,18 @@ const headers = () => ({
 
 export const activityAPI = {
   getAll: async (params: ActivityLogParams = {}): Promise<ActivityLogsData> => {
-    const queryString = new URLSearchParams(params as Record<string, string>).toString()
+    const queryParams = new URLSearchParams()
+    
+    if (params.search) queryParams.set('search', params.search)
+    if (params.action_type) queryParams.set('action_type', params.action_type)
+    if (params.status) queryParams.set('status', params.status)
+    if (params.source) queryParams.set('source', params.source)
+    if (params.date_from) queryParams.set('date_from', params.date_from)
+    if (params.date_to) queryParams.set('date_to', params.date_to)
+    if (params.limit) queryParams.set('limit', params.limit.toString())
+    if (params.offset) queryParams.set('offset', params.offset.toString())
+    
+    const queryString = queryParams.toString()
     const response = await fetch(`${API_BASE}/activity-logs${queryString ? '?' + queryString : ''}`, {
       headers: headers()
     })

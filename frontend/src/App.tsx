@@ -9,12 +9,13 @@ import Tasks from './components/Tasks'
 import ActivityLogs from './components/ActivityLogs'
 import ImageRenamer from './components/ImageRenamer'
 import ChatWidget from './components/ChatWidget'
+import CashflowFormModal from './components/CashflowFormModal'
 import { cashflowAPI } from './api/cashflow'
 import { useRealtimeCashflow } from './hooks/useRealtimeData'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
 import { ThemeToggle } from './components/ThemeToggle'
-import { LogOut, Wallet, ListTodo, Activity, Image } from 'lucide-react'
+import { LogOut, Wallet, ListTodo, Activity, Image, MessageCircle } from 'lucide-react'
 import { TooltipProvider } from '@/components/ui/tooltip'
 
 interface Filters {
@@ -47,6 +48,9 @@ interface Summary {
 function CashflowApp() {
   const { logout } = useAuth()
   const [activeTab, setActiveTab] = useState('cashflow')
+  const [chatOpen, setChatOpen] = useState(false)
+  const [cashflowModalOpen, setCashflowModalOpen] = useState(false)
+  const [editingCashflow, setEditingCashflow] = useState<CashflowEntry | null>(null)
   const [summary, setSummary] = useState<Summary>({ totalIncome: 0, totalExpenses: 0, balance: 0, transactionCount: 0 })
   const [filters, setFilters] = useState<Filters>({ category: 'All', currency: 'All', search: '' })
   const [cashflowSortBy, setCashflowSortBy] = useState<CashflowSortField | null>(null)
@@ -98,6 +102,46 @@ function CashflowApp() {
     }
   }
 
+  const handleAddCashflow = async (entry: Partial<CashflowEntry>) => {
+    try {
+      await cashflowAPI.add(entry)
+      refresh()
+      cashflowAPI.getSummary().then(setSummary).catch(console.error)
+    } catch (error) {
+      console.error('Error adding entry:', error)
+    }
+  }
+
+  const handleEditCashflow = async (entry: Partial<CashflowEntry>) => {
+    if (!entry.id) return
+    try {
+      await cashflowAPI.update(entry.id, entry)
+      refresh()
+      cashflowAPI.getSummary().then(setSummary).catch(console.error)
+    } catch (error) {
+      console.error('Error updating entry:', error)
+    }
+  }
+
+  const handleCashflowSave = (entry: Partial<CashflowEntry>) => {
+    if (editingCashflow?.id) {
+      handleEditCashflow(entry)
+    } else {
+      handleAddCashflow(entry)
+    }
+    setEditingCashflow(null)
+  }
+
+  const handleOpenAddModal = () => {
+    setEditingCashflow(null)
+    setCashflowModalOpen(true)
+  }
+
+  const handleOpenEditModal = (entry: CashflowEntry) => {
+    setEditingCashflow(entry)
+    setCashflowModalOpen(true)
+  }
+
   return (
     <TooltipProvider>
       <div className="min-h-screen bg-background">
@@ -109,6 +153,9 @@ function CashflowApp() {
                 <h1 className="text-base font-semibold">Emily's Web App</h1>
               </div>
               <div className="flex items-center gap-2">
+                <Button variant="ghost" size="icon" onClick={() => setChatOpen(!chatOpen)}>
+                  <MessageCircle className="h-4 w-4" />
+                </Button>
                 <ThemeToggle />
                 <Button variant="ghost" size="sm" onClick={logout}>
                   <LogOut className="h-4 w-4 mr-1.5" />
@@ -137,11 +184,11 @@ function CashflowApp() {
 
               <TabsContent value="cashflow" className="mt-6 space-y-6">
                 <SummaryCards summary={summary} />
-                <FilterBar onFilterChange={handleFilterChange} />
+                <FilterBar onFilterChange={handleFilterChange} onAddClick={handleOpenAddModal} />
                 {loading ? (
                   <div className="flex items-center justify-center py-12 text-muted-foreground">Loading...</div>
                 ) : (
-                  <CashflowTable entries={entries} onDelete={handleDelete} sortBy={cashflowSortBy} sortOrder={cashflowSortOrder} onSort={handleCashflowSort} />
+                  <CashflowTable entries={entries} onDelete={handleDelete} onEdit={handleOpenEditModal} sortBy={cashflowSortBy} sortOrder={cashflowSortOrder} onSort={handleCashflowSort} />
                 )}
               </TabsContent>
 
@@ -156,7 +203,17 @@ function CashflowApp() {
           </div>
         </div>
 
-        <ChatWidget />
+        <ChatWidget isExpanded={chatOpen} setIsExpanded={setChatOpen} />
+        
+        <CashflowFormModal 
+          open={cashflowModalOpen} 
+          onOpenChange={(open) => {
+            setCashflowModalOpen(open)
+            if (!open) setEditingCashflow(null)
+          }} 
+          onSave={handleCashflowSave}
+          initialData={editingCashflow}
+        />
       </div>
     </TooltipProvider>
   )

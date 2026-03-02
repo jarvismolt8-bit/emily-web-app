@@ -7,7 +7,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { Trash2 } from 'lucide-react'
+import { Trash2, Pencil } from 'lucide-react'
 
 const CATEGORY_EMOJIS: Record<string, string> = {
   'Income': '💰',
@@ -48,6 +48,7 @@ type SortOrder = 'asc' | 'desc'
 interface CashflowTableProps {
   entries: CashflowEntry[]
   onDelete: (id: string) => void
+  onEdit: (entry: CashflowEntry) => void
   sortBy?: SortField | null
   sortOrder?: SortOrder
   onSort?: (field: SortField) => void
@@ -60,7 +61,7 @@ function SortIndicator({ field, currentField, currentOrder }: { field: SortField
   return <span className="ml-1">{currentOrder === 'asc' ? '▲' : '▼'}</span>
 }
 
-export default function CashflowTable({ entries, onDelete, sortBy, sortOrder, onSort }: CashflowTableProps) {
+export default function CashflowTable({ entries, onDelete, onEdit, sortBy, sortOrder, onSort }: CashflowTableProps) {
   return (
     <div className="overflow-x-auto rounded-lg border">
       <Table>
@@ -76,7 +77,7 @@ export default function CashflowTable({ entries, onDelete, sortBy, sortOrder, on
             <TableHead className="text-right cursor-pointer select-none hover:text-foreground" onClick={() => onSort?.('amount')}>
               Amount<SortIndicator field="amount" currentField={sortBy} currentOrder={sortOrder} />
             </TableHead>
-            <TableHead className="w-[50px]"></TableHead>
+            <TableHead className="w-[90px]"></TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -106,15 +107,25 @@ export default function CashflowTable({ entries, onDelete, sortBy, sortOrder, on
                     {entry.amount >= 0 ? '+' : '-'}{CURRENCY_SYMBOLS[entry.currency] || entry.currency}{Math.abs(entry.amount).toFixed(2)}
                   </span>
                 </TableCell>
-                <TableCell>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => onDelete(entry.id)}
-                    className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
+                <TableCell className="w-[90px]">
+                  <div className="flex items-center gap-1">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => onEdit(entry)}
+                      className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => onDelete(entry.id)}
+                      className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </TableCell>
               </TableRow>
             ))

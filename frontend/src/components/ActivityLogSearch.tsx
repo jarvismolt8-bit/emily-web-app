@@ -42,6 +42,8 @@ interface SearchParams {
   source?: string
   date_from?: string
   date_to?: string
+  limit?: number
+  offset?: number
 }
 
 interface ActivityLogSearchProps {
@@ -70,7 +72,9 @@ export default function ActivityLogSearch({ onSearch, loading }: ActivityLogSear
       status: getApiValue(STATUSES, status) || undefined,
       source: getApiValue(SOURCES, source) || undefined,
       date_from: dateFrom || undefined,
-      date_to: dateTo || undefined
+      date_to: dateTo || undefined,
+      limit: 20,
+      offset: 0
     })
   }
 

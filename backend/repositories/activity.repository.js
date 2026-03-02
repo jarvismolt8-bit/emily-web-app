@@ -1,44 +1,54 @@
 const { getDb } = require('../db');
 
 const activityRepo = {
-  findAll({ search, action_type, status, source, date_from, date_to } = {}) {
+  findAll({ search, action_type, status, source, date_from, date_to, limit = 20, offset = 0 } = {}) {
     const db = getDb();
-    let sql = 'SELECT * FROM activity_logs WHERE 1=1';
+    let whereSql = 'WHERE 1=1';
     const params = [];
 
     if (search) {
-      sql += ' AND (description LIKE ? OR details LIKE ?)';
+      whereSql += ' AND (description LIKE ? OR details LIKE ?)';
       params.push(`%${search}%`, `%${search}%`);
     }
     if (action_type) {
-      sql += ' AND action_type = ?';
+      whereSql += ' AND action_type = ?';
       params.push(action_type);
     }
     if (status) {
-      sql += ' AND status = ?';
+      whereSql += ' AND status = ?';
       params.push(status);
     }
     if (source) {
-      sql += ' AND source = ?';
+      whereSql += ' AND source = ?';
       params.push(source);
     }
     if (date_from) {
-      sql += ' AND timestamp >= ?';
+      whereSql += ' AND timestamp >= ?';
       params.push(new Date(date_from).toISOString());
     }
     if (date_to) {
-      sql += ' AND timestamp <= ?';
+      whereSql += ' AND timestamp <= ?';
       params.push(new Date(date_to).toISOString());
     }
 
-    sql += ' ORDER BY timestamp DESC';
+    // Get total count for pagination
+    const countSql = `SELECT COUNT(*) as count FROM activity_logs ${whereSql}`;
+    const totalCount = db.prepare(countSql).get(...params).count;
 
-    const rows = db.prepare(sql).all(...params);
+    // Get paginated results
+    const dataSql = `SELECT * FROM activity_logs ${whereSql} ORDER BY timestamp DESC LIMIT ? OFFSET ?`;
+    const rows = db.prepare(dataSql).all(...params, limit, offset);
 
-    return rows.map(row => ({
-      ...row,
-      details: row.details ? JSON.parse(row.details) : {}
-    }));
+    return {
+      logs: rows.map(row => ({
+        ...row,
+        details: row.details ? JSON.parse(row.details) : {}
+      })),
+      total_count: totalCount,
+      limit,
+      offset,
+      has_more: (offset + rows.length) < totalCount
+    };
   },
 
   getStats() {

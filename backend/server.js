@@ -609,6 +609,8 @@ app.post('/api/emily/tasks/delete-by-name', verifyPassword, (req, res) => {
 
 const server = http.createServer(app);
 
+// TEMPORARILY DISABLED - Chat WebSocket server disabled
+/*
 const wss = new WebSocket.Server({
   server,
   path: '/api/chat',
@@ -690,6 +692,7 @@ wss.on('connection', (ws, req) => {
     console.error('[Chat] WebSocket error:', error);
   });
 });
+*/
 
 async function handleChatCommand(ws, message, sessionKey) {
   const { command, data } = message;
@@ -730,16 +733,59 @@ async function handleChatCommand(ws, message, sessionKey) {
   }
 }
 
-gatewayClient.connect().then(() => {
-  console.log('[Gateway] Connected to OpenClaw');
-}).catch(err => {
-  console.error('[Gateway] Failed to connect:', err.message);
-  console.log('[Gateway] Will retry on first chat message');
-});
+/*
+async function handleChatCommand(ws, message, sessionKey) {
+  const { command, data } = message;
+
+  try {
+    switch (command) {
+      case 'get_history':
+        const history = await gatewayClient.getChatHistory(sessionKey, data?.limit || 50);
+        ws.send(JSON.stringify({
+          type: 'history',
+          messages: history.messages || [],
+          timestamp: new Date().toISOString()
+        }));
+        break;
+
+      case 'clear_chat':
+        ws.send(JSON.stringify({
+          type: 'system',
+          content: 'Chat history cleared for this session.',
+          timestamp: new Date().toISOString()
+        }));
+        break;
+
+      default:
+        ws.send(JSON.stringify({
+          type: 'error',
+          content: `Unknown command: ${command}`,
+          timestamp: new Date().toISOString()
+        }));
+    }
+  } catch (error) {
+    console.error('[Chat] Command error:', error);
+    ws.send(JSON.stringify({
+      type: 'error',
+      content: 'Failed to execute command.',
+      timestamp: new Date().toISOString()
+    }));
+  }
+}
+*/
+
+// TEMPORARILY DISABLED - Chat to Emily via OpenClaw Gateway disabled
+// gatewayClient.connect().then(() => {
+//   console.log('[Gateway] Connected to OpenClaw');
+// }).catch(err => {
+//   console.error('[Gateway] Failed to connect:', err.message);
+//   console.log('[Gateway] Will retry on first chat message');
+// });
 
 server.listen(PORT, () => {
   console.log(`Cashflow API running on http://localhost:${PORT}`);
-  console.log(`WebSocket chat available at ws://localhost:${PORT}/api/chat`);
+  // console.log(`WebSocket chat available at ws://localhost:${PORT}/api/chat`);
+  console.log(`WebSocket chat DISABLED - TEMPORARILY`);
   console.log(`SQLite database at ${process.env.DATABASE_PATH}`);
 });
 

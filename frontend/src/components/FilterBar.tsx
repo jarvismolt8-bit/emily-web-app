@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Input } from '@/components/ui/input'
-import { Search } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Search, Plus } from 'lucide-react'
 import {
   Select,
   SelectContent,
@@ -20,9 +21,10 @@ interface Filters {
 
 interface FilterBarProps {
   onFilterChange: (filters: Filters) => void
+  onAddClick: () => void
 }
 
-export default function FilterBar({ onFilterChange }: FilterBarProps) {
+export default function FilterBar({ onFilterChange, onAddClick }: FilterBarProps) {
   const [category, setCategory] = useState('All')
   const [currency, setCurrency] = useState('All')
   const [search, setSearch] = useState('')
@@ -72,6 +74,11 @@ export default function FilterBar({ onFilterChange }: FilterBarProps) {
           className="pl-9"
         />
       </div>
+      
+      <Button onClick={onAddClick}>
+        <Plus className="h-4 w-4 mr-2" />
+        Add
+      </Button>
     </div>
   )
 }

@@ -5,12 +5,24 @@ const activityRepo = require('../../repositories/activity.repository');
 
 router.get('/', (req, res) => {
   try {
-    const { search, action_type, date_from, date_to, status, source } = req.query;
-    const logs = activityRepo.findAll({ search, action_type, date_from, date_to, status, source });
+    const { search, action_type, date_from, date_to, status, source, limit, offset } = req.query;
+    
+    const parsedLimit = limit ? parseInt(limit, 10) : 20;
+    const parsedOffset = offset ? parseInt(offset, 10) : 0;
+    
+    const result = activityRepo.findAll({ 
+      search, 
+      action_type, 
+      date_from, 
+      date_to, 
+      status, 
+      source,
+      limit: parsedLimit,
+      offset: parsedOffset
+    });
 
     sendSuccess(res, {
-      logs,
-      total_count: logs.length,
+      ...result,
       last_cleanup: null
     });
   } catch (error) {

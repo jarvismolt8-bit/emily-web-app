@@ -191,8 +191,8 @@ export default function TaskModal({ isOpen, onClose, onSave, onDelete, task }: T
               />
             </div>
 
-            <div className="flex flex-wrap items-end gap-2">
-              <div className="min-w-[140px] flex-1">
+            <div className="flex flex-col md:flex-row gap-2">
+              <div className="w-full">
                 <Label htmlFor="datetime" className="text-muted-foreground">Date & Time</Label>
                 <Input
                   id="datetime"
@@ -207,40 +207,42 @@ export default function TaskModal({ isOpen, onClose, onSave, onDelete, task }: T
                       setFormData({ ...formData, date: '', time: '' })
                     }
                   }}
-                  className="mt-2"
+                  className="mt-2 w-full max-w-[180px] text-sm"
                 />
               </div>
-              <div className="min-w-[100px]">
-                <Label className="text-muted-foreground">Status</Label>
-                <Select
-                  value={formData.status}
-                  onValueChange={(val) => setFormData({ ...formData, status: val })}
-                >
-                  <SelectTrigger className="mt-2 w-full">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {STATUSES.map(status => (
-                      <SelectItem key={status} value={status}>{STATUS_LABELS[status]}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="min-w-[100px]">
-                <Label className="text-muted-foreground">Priority</Label>
-                <Select
-                  value={formData.priority}
-                  onValueChange={(val) => setFormData({ ...formData, priority: val })}
-                >
-                  <SelectTrigger className="mt-2 w-full">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {PRIORITIES.map(priority => (
-                      <SelectItem key={priority} value={priority}>{priority}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+              <div className="flex gap-2 w-full">
+                <div className="flex-1 min-w-[120px]">
+                  <Label className="text-muted-foreground">Priority</Label>
+                  <Select
+                    value={formData.priority}
+                    onValueChange={(val) => setFormData({ ...formData, priority: val })}
+                  >
+                    <SelectTrigger className="mt-2 w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {PRIORITIES.map(priority => (
+                        <SelectItem key={priority} value={priority}>{priority}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex-1 min-w-[120px]">
+                  <Label className="text-muted-foreground">Status</Label>
+                  <Select
+                    value={formData.status}
+                    onValueChange={(val) => setFormData({ ...formData, status: val })}
+                  >
+                    <SelectTrigger className="mt-2 w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {STATUSES.map(status => (
+                        <SelectItem key={status} value={status}>{STATUS_LABELS[status]}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
             </div>
 
@@ -275,7 +277,19 @@ export default function TaskModal({ isOpen, onClose, onSave, onDelete, task }: T
                   <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
                 </div>
               ) : docContent ? (
-                <div className="prose prose-sm dark:prose-invert max-w-none">
+                <div className="max-w-none space-y-3 text-sm text-foreground
+                  [&_h1]:text-2xl [&_h1]:font-bold [&_h1]:mb-3
+                  [&_h2]:text-xl [&_h2]:font-bold [&_h2]:mb-2
+                  [&_h3]:text-lg [&_h3]:font-semibold [&_h3]:mb-2
+                  [&_p]:mb-2
+                  [&_ul]:list-disc [&_ul]:list-inside [&_ul]:mb-2
+                  [&_ol]:list-decimal [&_ol]:list-inside [&_ol]:mb-2
+                  [&_li]:mb-1
+                  [&_code]:bg-muted [&_code]:rounded [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:text-xs
+                  [&_pre]:bg-muted [&_pre]:rounded [&_pre]:p-3 [&_pre]:overflow-x-auto [&_pre]:mb-3
+                  [&_a]:text-blue-500 [&_a]:underline
+                  [&_strong]:font-semibold
+                  [&_blockquote]:border-l-4 [&_blockquote]:border-muted [&_blockquote]:pl-3 [&_blockquote]:italic">
                   <ReactMarkdown>{docContent}</ReactMarkdown>
                 </div>
               ) : (

@@ -56,11 +56,11 @@ function DialogContent({
   size?: "default" | "sm" | "lg" | "xl" | "full"
 }) {
   const sizeClasses = {
-    default: "sm:max-w-lg",
-    sm: "sm:max-w-sm",
-    lg: "sm:max-w-2xl",
-    xl: "sm:max-w-5xl",
-    full: "sm:max-w-[calc(100vw-2rem)]"
+    default: "max-w-[calc(100%-2rem)] sm:max-w-lg",
+    sm: "max-w-[calc(100%-2rem)] sm:max-w-sm",
+    lg: "max-w-[calc(100%-2rem)] sm:max-w-2xl",
+    xl: "max-w-[calc(100%-2rem)] sm:max-w-5xl",
+    full: "max-w-[calc(100%-2rem)] sm:max-w-[calc(100vw-2rem)]"
   }
   
   return (
