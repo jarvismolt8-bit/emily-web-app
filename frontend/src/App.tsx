@@ -122,8 +122,8 @@ const [filters, setFilters] = useState<Filters>({
   const { data: entries, loading, refresh } = useRealtimeCashflow(fetchCashflow, 'cashflow-updates', handleCashflowFilter)
 
   useEffect(() => {
-    cashflowAPI.getSummary().then(setSummary).catch(console.error)
-  }, [entries])
+    cashflowAPI.getSummary({ startDate: filters.startDate, endDate: filters.endDate }).then(setSummary).catch(console.error)
+  }, [entries, filters.startDate, filters.endDate])
 
   useEffect(() => {
     refresh()
@@ -146,12 +146,16 @@ const [filters, setFilters] = useState<Filters>({
     }
   }
 
+  const getFilteredSummary = () => {
+    return cashflowAPI.getSummary({ startDate: filters.startDate, endDate: filters.endDate }).then(setSummary).catch(console.error)
+  }
+
   const handleDelete = async (id: string) => {
     if (window.confirm('Delete this transaction?')) {
       try {
         await cashflowAPI.delete(id)
         refresh()
-        cashflowAPI.getSummary().then(setSummary).catch(console.error)
+        getFilteredSummary()
       } catch (error) {
         console.error('Error deleting entry:', error)
       }
@@ -162,7 +166,7 @@ const [filters, setFilters] = useState<Filters>({
     try {
       await cashflowAPI.add(entry)
       refresh()
-      cashflowAPI.getSummary().then(setSummary).catch(console.error)
+      getFilteredSummary()
     } catch (error) {
       console.error('Error adding entry:', error)
     }
@@ -173,7 +177,7 @@ const [filters, setFilters] = useState<Filters>({
     try {
       await cashflowAPI.update(entry.id, entry)
       refresh()
-      cashflowAPI.getSummary().then(setSummary).catch(console.error)
+      getFilteredSummary()
     } catch (error) {
       console.error('Error updating entry:', error)
     }

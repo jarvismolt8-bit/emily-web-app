@@ -16,7 +16,8 @@ router.get('/', (req, res) => {
 
 router.get('/summary', (req, res) => {
   try {
-    const summary = cashflowRepo.getSummary();
+    const { startDate, endDate } = req.query;
+    const summary = cashflowRepo.getSummary({ startDate, endDate });
     sendSuccess(res, summary);
   } catch (error) {
     sendError(res, 'INTERNAL_ERROR', error.message, 500);

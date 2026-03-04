@@ -69,11 +69,23 @@ const cashflowRepo = {
     return getDb().prepare('SELECT * FROM cashflow WHERE id = ?').get(id);
   },
 
-  getSummary() {
+  getSummary({ startDate, endDate } = {}) {
     const db = getDb();
-    const totalIncome = db.prepare('SELECT COALESCE(SUM(amount), 0) as total FROM cashflow WHERE amount > 0').get().total;
-    const totalExpenses = Math.abs(db.prepare('SELECT COALESCE(SUM(amount), 0) as total FROM cashflow WHERE amount < 0').get().total);
-    const transactionCount = db.prepare('SELECT COUNT(*) as count FROM cashflow').get().count;
+    let whereClause = '1=1';
+    const params = [];
+
+    if (startDate) {
+      whereClause += ' AND date >= ?';
+      params.push(startDate);
+    }
+    if (endDate) {
+      whereClause += ' AND date <= ?';
+      params.push(endDate);
+    }
+
+    const totalIncome = db.prepare(`SELECT COALESCE(SUM(amount), 0) as total FROM cashflow WHERE amount > 0 AND ${whereClause}`).get(...params).total;
+    const totalExpenses = Math.abs(db.prepare(`SELECT COALESCE(SUM(amount), 0) as total FROM cashflow WHERE amount < 0 AND ${whereClause}`).get(...params).total);
+    const transactionCount = db.prepare(`SELECT COUNT(*) as count FROM cashflow WHERE ${whereClause}`).get(...params).count;
     return {
       totalIncome,
       totalExpenses,

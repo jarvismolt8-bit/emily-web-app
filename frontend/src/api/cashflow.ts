@@ -69,8 +69,9 @@ export const cashflowAPI = {
     return unwrapResponse<CashflowEntry>(response)
   },
 
-  getSummary: async (): Promise<Summary> => {
-    const response = await fetch(`${API_BASE}/cashflow/summary`, {
+  getSummary: async (params: { startDate?: string; endDate?: string } = {}): Promise<Summary> => {
+    const queryString = new URLSearchParams(params as Record<string, string>).toString()
+    const response = await fetch(`${API_BASE}/cashflow/summary${queryString ? '?' + queryString : ''}`, {
       headers: headers()
     })
     return unwrapResponse<Summary>(response)
