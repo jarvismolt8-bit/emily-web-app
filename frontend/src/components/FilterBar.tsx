@@ -9,7 +9,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { DatePicker } from '@/components/ui/date-picker'
 
 const CATEGORIES = ['All', 'Income', 'Investment', 'Food', 'Transport', 'Utilities', 'Shopping', 'Entertainment', 'Health', 'Airbnb', 'Other']
 const CURRENCIES = ['All', 'PHP', 'USD', 'EUR']
@@ -102,13 +101,13 @@ export default function FilterBar({ onFilterChange, onAddClick }: FilterBarProps
     }
   }
 
-  const handleStartDateChange = (val: string | undefined) => {
+  const handleStartDateChange = (val: string) => {
     const newStart = val || ''
     setStartDate(newStart)
     emitChange({ startDate: newStart })
   }
 
-  const handleEndDateChange = (val: string | undefined) => {
+  const handleEndDateChange = (val: string) => {
     const newEnd = val || ''
     setEndDate(newEnd)
     emitChange({ endDate: newEnd })
@@ -133,16 +132,18 @@ export default function FilterBar({ onFilterChange, onAddClick }: FilterBarProps
 
       {dateRange === 'Date range' && (
         <>
-          <DatePicker
+          <Input
+            type="date"
             value={startDate}
-            onChange={handleStartDateChange}
-            placeholder="Start date"
+            onChange={(e) => handleStartDateChange(e.target.value)}
+            className="w-[140px]"
           />
           <span className="text-muted-foreground">to</span>
-          <DatePicker
+          <Input
+            type="date"
             value={endDate}
-            onChange={handleEndDateChange}
-            placeholder="End date"
+            onChange={(e) => handleEndDateChange(e.target.value)}
+            className="w-[140px]"
           />
         </>
       )}

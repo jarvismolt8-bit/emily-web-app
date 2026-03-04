@@ -15,8 +15,9 @@ Add date range filter functionality to the cashflow tab in the web app.
 
 1. **Frontend - FilterBar.tsx**
    - Added date range dropdown with 3 options
-   - Added DatePicker components for custom date range
-   - Added local timezone handling to prevent date shifting
+   - Initially used DatePicker component (non-functional)
+   - **Fixed**: Replaced DatePicker with native HTML `<input type="date">` on 2025-03-04
+   - Date inputs now clickable and work correctly
 
 2. **Frontend - App.tsx**
    - Added date range state management
