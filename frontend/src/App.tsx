@@ -55,15 +55,22 @@ function CashflowApp() {
   const [cashflowModalOpen, setCashflowModalOpen] = useState(false)
   const [editingCashflow, setEditingCashflow] = useState<CashflowEntry | null>(null)
   const [summary, setSummary] = useState<Summary>({ totalIncome: 0, totalExpenses: 0, balance: 0, transactionCount: 0 })
-  const getDefaultDateRange = () => {
+  const formatDate = (date: Date): string => {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+const getDefaultDateRange = () => {
   const now = new Date()
   const year = now.getFullYear()
   const month = now.getMonth()
   const firstDay = new Date(year, month, 1)
   const lastDay = new Date(year, month + 1, 0)
   return {
-    startDate: firstDay.toISOString().split('T')[0],
-    endDate: lastDay.toISOString().split('T')[0]
+    startDate: formatDate(firstDay),
+    endDate: formatDate(lastDay)
   }
 }
 

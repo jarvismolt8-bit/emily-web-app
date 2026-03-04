@@ -29,6 +29,13 @@ interface FilterBarProps {
   onAddClick: () => void
 }
 
+function formatDate(date: Date): string {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
 function getDateRangeValues(range: string): { startDate: string; endDate: string } {
   const now = new Date()
   const year = now.getFullYear()
@@ -38,15 +45,15 @@ function getDateRangeValues(range: string): { startDate: string; endDate: string
     const firstDay = new Date(year, month, 1)
     const lastDay = new Date(year, month + 1, 0)
     return {
-      startDate: firstDay.toISOString().split('T')[0],
-      endDate: lastDay.toISOString().split('T')[0]
+      startDate: formatDate(firstDay),
+      endDate: formatDate(lastDay)
     }
   } else if (range === 'Last month') {
     const firstDay = new Date(year, month - 1, 1)
     const lastDay = new Date(year, month, 0)
     return {
-      startDate: firstDay.toISOString().split('T')[0],
-      endDate: lastDay.toISOString().split('T')[0]
+      startDate: formatDate(firstDay),
+      endDate: formatDate(lastDay)
     }
   }
   return { startDate: '', endDate: '' }
