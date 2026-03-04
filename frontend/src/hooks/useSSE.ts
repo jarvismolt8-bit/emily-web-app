@@ -5,6 +5,7 @@ export interface SSEEvent {
   data: any
   source: string
   timestamp: string
+  filters?: Record<string, any> | null
 }
 
 export function useSSE(onEvent: (event: SSEEvent) => void) {

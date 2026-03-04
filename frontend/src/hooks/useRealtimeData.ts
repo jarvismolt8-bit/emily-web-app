@@ -9,6 +9,7 @@ interface RealtimeState<T> {
 
 type DataFetcher<T> = () => Promise<T[]>
 type GetIdFn<T> = (item: T) => string
+type FilterCallback = (filters: Record<string, any> | null) => void
 
 export function useRealtimeData<T>(
   fetchData: DataFetcher<T>,
@@ -18,7 +19,8 @@ export function useRealtimeData<T>(
     deleted: string
   },
   getId: GetIdFn<T>,
-  broadcastChannelName?: string
+  broadcastChannelName?: string,
+  onFilter?: FilterCallback
 ): RealtimeState<T> {
   const [state, setState] = useState<RealtimeState<T>>({
     data: [],
@@ -73,12 +75,20 @@ export function useRealtimeData<T>(
 
   const handleEvent = useCallback((event: SSEEvent) => {
     const eventType = event.type
+    
+    if (eventType === 'cashflow:filter' || eventType === 'task:filter') {
+      if (onFilter) {
+        onFilter(event.filters)
+      }
+      return
+    }
+    
     handleSSEEvent(eventType, event)
     
     if (channelRef.current) {
       channelRef.current.postMessage({ eventType, payload: event })
     }
-  }, [handleSSEEvent])
+  }, [handleSSEEvent, onFilter])
 
   useSSE(handleEvent)
 
@@ -108,7 +118,8 @@ export function useRealtimeData<T>(
 
 export function useRealtimeCashflow(
   fetchFn: () => Promise<any[]>,
-  broadcastChannelName = 'cashflow-updates'
+  broadcastChannelName = 'cashflow-updates',
+  onFilter?: FilterCallback
 ) {
   return useRealtimeData(
     fetchFn,
@@ -118,13 +129,15 @@ export function useRealtimeCashflow(
       deleted: 'cashflow:deleted'
     },
     (item) => item.id,
-    broadcastChannelName
+    broadcastChannelName,
+    onFilter
   )
 }
 
 export function useRealtimeTasks(
   fetchFn: () => Promise<any[]>,
-  broadcastChannelName = 'tasks-updates'
+  broadcastChannelName = 'tasks-updates',
+  onFilter?: FilterCallback
 ) {
   return useRealtimeData(
     fetchFn,
@@ -134,6 +147,7 @@ export function useRealtimeTasks(
       deleted: 'task:deleted'
     },
     (item) => item.id,
-    broadcastChannelName
+    broadcastChannelName,
+    onFilter
   )
 }

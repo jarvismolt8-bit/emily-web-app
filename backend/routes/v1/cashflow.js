@@ -111,6 +111,39 @@ router.put('/:id', (req, res) => {
   }
 });
 
+router.post('/filter', (req, res) => {
+  try {
+    const { filterStore } = require('../../server');
+    const password = req.headers['x-password'];
+    const filters = req.body;
+    
+    filterStore.set(`cashflow:${password}`, filters);
+    
+    const eventBus = require('../../events');
+    eventBus.emit('cashflow:filter', { filters, source: req.source || 'telegram' });
+    
+    sendSuccess(res, { filters }, 'Cashflow filter set');
+  } catch (error) {
+    sendError(res, 'INTERNAL_ERROR', error.message, 500);
+  }
+});
+
+router.delete('/filter', (req, res) => {
+  try {
+    const { filterStore } = require('../../server');
+    const password = req.headers['x-password'];
+    
+    filterStore.delete(`cashflow:${password}`);
+    
+    const eventBus = require('../../events');
+    eventBus.emit('cashflow:filter', { filters: null, source: req.source || 'telegram' });
+    
+    sendSuccess(res, { filters: null }, 'Cashflow filter cleared');
+  } catch (error) {
+    sendError(res, 'INTERNAL_ERROR', error.message, 500);
+  }
+});
+
 router.delete('/:id', (req, res) => {
   try {
     const source = req.query.source || req.source || 'web_app';

@@ -23,6 +23,8 @@ interface TaskFilters {
   sortBy?: 'id' | 'date' | 'priority'
   sortOrder?: 'asc' | 'desc'
   status?: string
+  priority?: string
+  search?: string
 }
 
 interface Task {

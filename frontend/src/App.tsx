@@ -63,7 +63,19 @@ function CashflowApp() {
     })
   }, [filters, cashflowSortBy, cashflowSortOrder])
 
-  const { data: entries, loading, refresh } = useRealtimeCashflow(fetchCashflow)
+  const handleCashflowFilter = useCallback((newFilters: Record<string, any> | null) => {
+    if (newFilters) {
+      setFilters({
+        category: newFilters.category || 'All',
+        currency: newFilters.currency || 'All',
+        search: newFilters.search || ''
+      })
+    } else {
+      setFilters({ category: 'All', currency: 'All', search: '' })
+    }
+  }, [])
+
+  const { data: entries, loading, refresh } = useRealtimeCashflow(fetchCashflow, 'cashflow-updates', handleCashflowFilter)
 
   useEffect(() => {
     cashflowAPI.getSummary().then(setSummary).catch(console.error)

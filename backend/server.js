@@ -31,6 +31,10 @@ const app = express();
 const PORT = process.env.PORT || 3001;
 const WEB_PASSWORD = process.env.WEB_PASSWORD;
 
+const filterStore = new Map();
+
+module.exports = { app, filterStore };
+
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
@@ -433,6 +437,9 @@ eventBus.on('cashflow:deleted', (payload) => broadcastSSE('cashflow:deleted', pa
 eventBus.on('task:created', (payload) => broadcastSSE('task:created', payload));
 eventBus.on('task:updated', (payload) => broadcastSSE('task:updated', payload));
 eventBus.on('task:deleted', (payload) => broadcastSSE('task:deleted', payload));
+
+eventBus.on('cashflow:filter', (payload) => broadcastSSE('cashflow:filter', payload));
+eventBus.on('task:filter', (payload) => broadcastSSE('task:filter', payload));
 
 app.post('/api/emily/tasks/create', verifyPassword, (req, res) => {
   try {

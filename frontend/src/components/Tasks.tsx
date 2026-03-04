@@ -42,20 +42,35 @@ export default function Tasks({ showAddButton = true }: TasksProps) {
   const [sortOrder, setSortOrder] = useState<SortOrder>('desc')
   const [viewMode, setViewMode] = useState<ViewMode>('kanban')
   const [statusFilter, setStatusFilter] = useState<string | null>(null)
+  const [priorityFilter, setPriorityFilter] = useState<string | null>(null)
+  const [searchFilter, setSearchFilter] = useState<string>('')
 
   const fetchTasks = useCallback(async () => {
+    const applyFilters = viewMode === 'table'
     return tasksAPI.getAll({ 
       sortBy, 
       sortOrder,
-      ...(statusFilter && { status: statusFilter })
+      ...(applyFilters && statusFilter && { status: statusFilter }),
+      ...(applyFilters && priorityFilter && { priority: priorityFilter }),
+      ...(applyFilters && searchFilter && { search: searchFilter })
     })
-  }, [sortBy, sortOrder, statusFilter])
+  }, [sortBy, sortOrder, statusFilter, priorityFilter, searchFilter, viewMode])
 
-  const { data: tasks, loading, refresh: fetchTasksRefresh } = useRealtimeTasks(fetchTasks)
+  const { data: tasks, loading, refresh: fetchTasksRefresh } = useRealtimeTasks(fetchTasks, 'tasks-updates', (filters) => {
+    if (filters) {
+      if (filters.status) setStatusFilter(filters.status)
+      if (filters.priority) setPriorityFilter(filters.priority)
+      if (filters.search !== undefined) setSearchFilter(filters.search || '')
+    } else {
+      setStatusFilter(null)
+      setPriorityFilter(null)
+      setSearchFilter('')
+    }
+  })
 
   useEffect(() => {
     fetchTasksRefresh()
-  }, [sortBy, sortOrder, statusFilter, fetchTasksRefresh])
+  }, [sortBy, sortOrder, statusFilter, priorityFilter, searchFilter, fetchTasksRefresh])
 
   const handleSort = (field: SortField) => {
     if (sortBy === field) {
