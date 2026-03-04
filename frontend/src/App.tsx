@@ -22,6 +22,9 @@ interface Filters {
   category: string
   currency: string
   search: string
+  dateRange: string
+  startDate?: string
+  endDate?: string
 }
 
 type CashflowSortField = 'date' | 'category' | 'amount'
@@ -52,13 +55,36 @@ function CashflowApp() {
   const [cashflowModalOpen, setCashflowModalOpen] = useState(false)
   const [editingCashflow, setEditingCashflow] = useState<CashflowEntry | null>(null)
   const [summary, setSummary] = useState<Summary>({ totalIncome: 0, totalExpenses: 0, balance: 0, transactionCount: 0 })
-  const [filters, setFilters] = useState<Filters>({ category: 'All', currency: 'All', search: '' })
+  const getDefaultDateRange = () => {
+  const now = new Date()
+  const year = now.getFullYear()
+  const month = now.getMonth()
+  const firstDay = new Date(year, month, 1)
+  const lastDay = new Date(year, month + 1, 0)
+  return {
+    startDate: firstDay.toISOString().split('T')[0],
+    endDate: lastDay.toISOString().split('T')[0]
+  }
+}
+
+const defaultDateRange = getDefaultDateRange()
+const [filters, setFilters] = useState<Filters>({ 
+  category: 'All', 
+  currency: 'All', 
+  search: '',
+  dateRange: 'This month',
+  startDate: defaultDateRange.startDate,
+  endDate: defaultDateRange.endDate
+})
   const [cashflowSortBy, setCashflowSortBy] = useState<CashflowSortField | null>(null)
   const [cashflowSortOrder, setCashflowSortOrder] = useState<SortOrder>('asc')
 
   const fetchCashflow = useCallback(async () => {
+    const { dateRange, startDate, endDate, ...filterParams } = filters
     return cashflowAPI.getAll({ 
-      ...filters, 
+      ...filterParams,
+      startDate,
+      endDate,
       ...(cashflowSortBy && { sortBy: cashflowSortBy, sortOrder: cashflowSortOrder }) 
     })
   }, [filters, cashflowSortBy, cashflowSortOrder])
@@ -68,10 +94,21 @@ function CashflowApp() {
       setFilters({
         category: newFilters.category || 'All',
         currency: newFilters.currency || 'All',
-        search: newFilters.search || ''
+        search: newFilters.search || '',
+        dateRange: newFilters.dateRange || 'This month',
+        startDate: newFilters.startDate || '',
+        endDate: newFilters.endDate || ''
       })
     } else {
-      setFilters({ category: 'All', currency: 'All', search: '' })
+      const defaultRange = getDefaultDateRange()
+      setFilters({ 
+        category: 'All', 
+        currency: 'All', 
+        search: '',
+        dateRange: 'This month',
+        startDate: defaultRange.startDate,
+        endDate: defaultRange.endDate
+      })
     }
   }, [])
 
