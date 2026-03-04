@@ -22,6 +22,17 @@ Add date range filter functionality to the cashflow tab in the web app.
    - Added date range state management
    - Added `getDefaultDateRange()` function
    - Pass startDate/endDate to API calls
+   - Summary cards now update based on date filter
+
+3. **Backend - cashflow.repository.js**
+   - `getSummary()` now accepts `startDate` and `endDate` parameters
+   - Added WHERE clause for date filtering
+
+4. **Backend - cashflow.js route**
+   - Pass date params to repository
+
+5. **Frontend - api/cashflow.ts**
+   - `getSummary()` now accepts optional date params
 
 ### Technical Details
 
@@ -43,7 +54,13 @@ function formatDate(date: Date): string {
 - **Date range**: User selects custom start and end dates
 
 ### Backend
-The backend already supported date filtering via `startDate` and `endDate` query parameters - no backend changes needed.
+The backend already supported date filtering via `startDate` and `endDate` query parameters. Updated to support summary filtering.
+
+### Summary Cards
+The Total Income, Total Expenses, and Balance cards now reflect only the filtered data:
+- If "This month" is selected → shows March 2026 totals only
+- If "Last month" is selected → shows February 2026 totals only
+- If "Date range" is selected → shows only the selected date range totals
 
 ## Usage
 1. Open Cashflow tab in web app
