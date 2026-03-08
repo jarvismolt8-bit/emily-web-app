@@ -11,14 +11,24 @@
   "dependencies": {
     "archiver": "^7.0.1",
     "better-sqlite3": "^12.6.2",
+    "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
     "dotenv": "^16.3.1",
     "express": "^4.18.2",
+    "express-jwt": "^8.5.1",
+    "express-rate-limit": "^8.2.1",
+    "express-validator": "^7.3.1",
+    "helmet": "^8.1.0",
+    "jsonwebtoken": "^9.0.3",
     "multer": "^2.0.2",
     "openai": "^6.25.0",
+    "pino": "^10.3.1",
+    "pino-roll": "^4.0.0",
+    "redis": "^5.11.0",
     "swagger-ui-express": "^5.0.1",
     "uuid": "^13.0.0",
     "ws": "^8.19.0",
-    "yamljs": "^0.3.0"
+    "yamljs": "^0.3.0",
+    "zod": "^4.3.6"
   }
 }

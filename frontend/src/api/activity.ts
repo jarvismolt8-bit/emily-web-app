@@ -1,3 +1,5 @@
+import { fetchWithAuth, getAccessToken } from '../api/auth'
+
 const API_BASE = import.meta.env.VITE_API_URL || '/api/v1'
 
 interface ApiEnvelope<T> {
@@ -71,7 +73,7 @@ interface ActivityStats {
 
 const headers = () => ({
   'Content-Type': 'application/json',
-  'X-Password': import.meta.env.VITE_PASSWORD,
+  'Authorization': `Bearer ${getAccessToken()}`,
   'X-Source': 'web_app'
 })
 
@@ -89,21 +91,21 @@ export const activityAPI = {
     if (params.offset) queryParams.set('offset', params.offset.toString())
     
     const queryString = queryParams.toString()
-    const response = await fetch(`${API_BASE}/activity-logs${queryString ? '?' + queryString : ''}`, {
+    const response = await fetchWithAuth(`${API_BASE}/activity-logs${queryString ? '?' + queryString : ''}`, {
       headers: headers()
     })
     return unwrapResponse<ActivityLogsData>(response)
   },
 
   getStats: async (): Promise<ActivityStats> => {
-    const response = await fetch(`${API_BASE}/activity-logs/stats`, {
+    const response = await fetchWithAuth(`${API_BASE}/activity-logs/stats`, {
       headers: headers()
     })
     return unwrapResponse<ActivityStats>(response)
   },
 
   add: async (log: Partial<ActivityLog>): Promise<ActivityLog> => {
-    const response = await fetch(`${API_BASE}/activity-logs`, {
+    const response = await fetchWithAuth(`${API_BASE}/activity-logs`, {
       method: 'POST',
       headers: headers(),
       body: JSON.stringify(log)

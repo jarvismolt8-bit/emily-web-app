@@ -5,19 +5,31 @@ import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 
 interface PasswordGateProps {
-  onAuth: (password: string) => boolean
+  onAuth: (username: string, password: string) => Promise<boolean>
 }
 
 export default function PasswordGate({ onAuth }: PasswordGateProps) {
+  const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
 
-  const handleSubmit = (e: FormEvent) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
-    if (onAuth(password)) {
-      setError('')
-    } else {
-      setError('Invalid password')
+    if (!username || !password) {
+      setError('Username and password are required')
+      return
+    }
+    
+    setLoading(true)
+    setError('')
+    
+    const success = await onAuth(username, password)
+    
+    setLoading(false)
+    
+    if (!success) {
+      setError('Invalid credentials')
       setPassword('')
     }
   }
@@ -32,7 +44,19 @@ export default function PasswordGate({ onAuth }: PasswordGateProps) {
         <CardContent>
           <form onSubmit={handleSubmit}>
             <div className="mb-4">
-              <Label htmlFor="password" className="text-muted-foreground">Enter Password</Label>
+              <Label htmlFor="username" className="text-muted-foreground">Username</Label>
+              <Input
+                id="username"
+                type="text"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                placeholder="Enter username..."
+                className="mt-2"
+                autoComplete="username"
+              />
+            </div>
+            <div className="mb-4">
+              <Label htmlFor="password" className="text-muted-foreground">Password</Label>
               <Input
                 id="password"
                 type="password"
@@ -40,11 +64,12 @@ export default function PasswordGate({ onAuth }: PasswordGateProps) {
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Enter password..."
                 className="mt-2"
+                autoComplete="current-password"
               />
             </div>
             {error && <p className="text-destructive text-sm mb-4">{error}</p>}
-            <Button type="submit" variant="outline" className="w-full">
-              Enter
+            <Button type="submit" variant="outline" className="w-full" disabled={loading}>
+              {loading ? 'Signing in...' : 'Sign In'}
             </Button>
           </form>
         </CardContent>

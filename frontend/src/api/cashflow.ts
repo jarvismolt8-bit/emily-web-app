@@ -1,3 +1,5 @@
+import { fetchWithAuth, getAccessToken } from '../api/auth'
+
 const API_BASE = import.meta.env.VITE_API_URL || '/api/v1'
 
 interface ApiEnvelope<T> {
@@ -49,21 +51,21 @@ interface Summary {
 
 const headers = () => ({
   'Content-Type': 'application/json',
-  'X-Password': import.meta.env.VITE_PASSWORD,
+  'Authorization': `Bearer ${getAccessToken()}`,
   'X-Source': 'web_app'
 })
 
 export const cashflowAPI = {
   getAll: async (params: CashflowFilters = {}): Promise<CashflowEntry[]> => {
     const queryString = new URLSearchParams(params as Record<string, string>).toString()
-    const response = await fetch(`${API_BASE}/cashflow${queryString ? '?' + queryString : ''}`, {
+    const response = await fetchWithAuth(`${API_BASE}/cashflow${queryString ? '?' + queryString : ''}`, {
       headers: headers()
     })
     return unwrapResponse<CashflowEntry[]>(response)
   },
 
   getById: async (id: string): Promise<CashflowEntry> => {
-    const response = await fetch(`${API_BASE}/cashflow/${id}`, {
+    const response = await fetchWithAuth(`${API_BASE}/cashflow/${id}`, {
       headers: headers()
     })
     return unwrapResponse<CashflowEntry>(response)
@@ -71,14 +73,14 @@ export const cashflowAPI = {
 
   getSummary: async (params: { startDate?: string; endDate?: string } = {}): Promise<Summary> => {
     const queryString = new URLSearchParams(params as Record<string, string>).toString()
-    const response = await fetch(`${API_BASE}/cashflow/summary${queryString ? '?' + queryString : ''}`, {
+    const response = await fetchWithAuth(`${API_BASE}/cashflow/summary${queryString ? '?' + queryString : ''}`, {
       headers: headers()
     })
     return unwrapResponse<Summary>(response)
   },
 
   add: async (entry: Partial<CashflowEntry>): Promise<CashflowEntry> => {
-    const response = await fetch(`${API_BASE}/cashflow`, {
+    const response = await fetchWithAuth(`${API_BASE}/cashflow`, {
       method: 'POST',
       headers: headers(),
       body: JSON.stringify(entry)
@@ -87,7 +89,7 @@ export const cashflowAPI = {
   },
 
   update: async (id: string, entry: Partial<CashflowEntry>): Promise<CashflowEntry> => {
-    const response = await fetch(`${API_BASE}/cashflow/${id}`, {
+    const response = await fetchWithAuth(`${API_BASE}/cashflow/${id}`, {
       method: 'PUT',
       headers: headers(),
       body: JSON.stringify(entry)
@@ -96,7 +98,7 @@ export const cashflowAPI = {
   },
 
   delete: async (id: string): Promise<void> => {
-    const response = await fetch(`${API_BASE}/cashflow/${id}`, {
+    const response = await fetchWithAuth(`${API_BASE}/cashflow/${id}`, {
       method: 'DELETE',
       headers: headers()
     })

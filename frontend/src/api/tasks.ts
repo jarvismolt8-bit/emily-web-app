@@ -1,3 +1,5 @@
+import { fetchWithAuth, getAccessToken } from '../api/auth'
+
 const API_BASE = import.meta.env.VITE_API_URL || '/api/v1'
 
 interface ApiEnvelope<T> {
@@ -48,28 +50,28 @@ interface TaskFormData {
 
 const headers = () => ({
   'Content-Type': 'application/json',
-  'X-Password': import.meta.env.VITE_PASSWORD,
+  'Authorization': `Bearer ${getAccessToken()}`,
   'X-Source': 'web_app'
 })
 
 export const tasksAPI = {
   getAll: async (filters?: TaskFilters): Promise<Task[]> => {
     const queryString = filters ? new URLSearchParams(filters as Record<string, string>).toString() : ''
-    const response = await fetch(`${API_BASE}/tasks${queryString ? '?' + queryString : ''}`, {
+    const response = await fetchWithAuth(`${API_BASE}/tasks${queryString ? '?' + queryString : ''}`, {
       headers: headers()
     })
     return unwrapResponse<Task[]>(response)
   },
 
   getById: async (id: string): Promise<Task> => {
-    const response = await fetch(`${API_BASE}/tasks/${id}`, {
+    const response = await fetchWithAuth(`${API_BASE}/tasks/${id}`, {
       headers: headers()
     })
     return unwrapResponse<Task>(response)
   },
 
   add: async (task: TaskFormData): Promise<Task> => {
-    const response = await fetch(`${API_BASE}/tasks`, {
+    const response = await fetchWithAuth(`${API_BASE}/tasks`, {
       method: 'POST',
       headers: headers(),
       body: JSON.stringify(task)
@@ -78,7 +80,7 @@ export const tasksAPI = {
   },
 
   update: async (id: string, task: TaskFormData): Promise<Task> => {
-    const response = await fetch(`${API_BASE}/tasks/${id}`, {
+    const response = await fetchWithAuth(`${API_BASE}/tasks/${id}`, {
       method: 'PUT',
       headers: headers(),
       body: JSON.stringify(task)
@@ -87,7 +89,7 @@ export const tasksAPI = {
   },
 
   updateStatus: async (id: string, status: 'backlog' | 'in_progress' | 'done'): Promise<Task> => {
-    const response = await fetch(`${API_BASE}/tasks/${id}`, {
+    const response = await fetchWithAuth(`${API_BASE}/tasks/${id}`, {
       method: 'PUT',
       headers: headers(),
       body: JSON.stringify({ status })
@@ -96,7 +98,7 @@ export const tasksAPI = {
   },
 
   delete: async (id: string): Promise<void> => {
-    const response = await fetch(`${API_BASE}/tasks/${id}`, {
+    const response = await fetchWithAuth(`${API_BASE}/tasks/${id}`, {
       method: 'DELETE',
       headers: headers()
     })
@@ -104,7 +106,7 @@ export const tasksAPI = {
   },
 
   deleteByName: async (name: string): Promise<void> => {
-    const response = await fetch(`${API_BASE}/tasks?name=${encodeURIComponent(name)}`, {
+    const response = await fetchWithAuth(`${API_BASE}/tasks?name=${encodeURIComponent(name)}`, {
       method: 'DELETE',
       headers: headers()
     })

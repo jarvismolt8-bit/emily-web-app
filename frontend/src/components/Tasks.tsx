@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { tasksAPI } from '../api/tasks'
 import { useRealtimeTasks } from '../hooks/useRealtimeData'
+import { useConfetti } from '../hooks/useConfetti'
 import TaskTable from './TaskTable'
 import TaskModal from './TaskModal'
 import TaskKanban from './TaskKanban'
@@ -68,6 +69,8 @@ export default function Tasks({ showAddButton = true }: TasksProps) {
     }
   })
 
+  const { triggerCelebration } = useConfetti()
+
   useEffect(() => {
     fetchTasksRefresh()
   }, [sortBy, sortOrder, statusFilter, priorityFilter, searchFilter, fetchTasksRefresh])
@@ -109,6 +112,9 @@ export default function Tasks({ showAddButton = true }: TasksProps) {
   const handleStatusChange = async (taskId: string, newStatus: Task['status']) => {
     try {
       await tasksAPI.updateStatus(taskId, newStatus)
+      if (newStatus === 'done') {
+        triggerCelebration()
+      }
       fetchTasksRefresh()
     } catch (error) {
       console.error('Error updating task status:', error)
@@ -118,8 +124,12 @@ export default function Tasks({ showAddButton = true }: TasksProps) {
 
   const handleSave = async (formData: TaskFormData) => {
     try {
+      const isBecomingDone = editingTask && editingTask.status !== 'done' && formData.status === 'done'
       if (editingTask) {
         await tasksAPI.update(editingTask.id, formData)
+        if (isBecomingDone) {
+          triggerCelebration()
+        }
       } else {
         await tasksAPI.add(formData)
       }

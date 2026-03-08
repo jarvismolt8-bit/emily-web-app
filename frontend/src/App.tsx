@@ -280,7 +280,15 @@ const [filters, setFilters] = useState<Filters>({
 }
 
 export default function App() {
-  const { isAuthenticated, login } = useAuth()
+  const { isAuthenticated, login, isLoading } = useAuth()
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <p className="text-muted-foreground">Loading...</p>
+      </div>
+    )
+  }
 
   if (!isAuthenticated) {
     return <PasswordGate onAuth={login} />

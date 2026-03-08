@@ -19,7 +19,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
-import { Trash2, Loader2 } from 'lucide-react'
+import { Trash2, Loader2, Pencil, X, Save } from 'lucide-react'
 
 const STATUSES = ['backlog', 'in_progress', 'done']
 const STATUS_LABELS: Record<string, string> = {
@@ -69,6 +69,9 @@ export default function TaskModal({ isOpen, onClose, onSave, onDelete, task }: T
   })
   const [docContent, setDocContent] = useState('')
   const [docLoading, setDocLoading] = useState(false)
+  const [isEditingDoc, setIsEditingDoc] = useState(false)
+  const [docDraft, setDocDraft] = useState('')
+  const [docSaving, setDocSaving] = useState(false)
 
   useEffect(() => {
     if (task) {
@@ -105,6 +108,7 @@ export default function TaskModal({ isOpen, onClose, onSave, onDelete, task }: T
   useEffect(() => {
     if (task && task.id && isOpen) {
       fetchDocumentation(task.id)
+      setIsEditingDoc(false)
     }
   }, [task?.id, isOpen])
 
@@ -128,6 +132,31 @@ export default function TaskModal({ isOpen, onClose, onSave, onDelete, task }: T
       setDocContent('')
     } finally {
       setDocLoading(false)
+    }
+  }
+
+  const saveDocumentation = async () => {
+    if (!task?.id) return
+    setDocSaving(true)
+    try {
+      const response = await fetch(`${API_BASE}/tasks/${task.id}/documentation`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Password': '10716255',
+          'X-Source': 'web_app'
+        },
+        body: JSON.stringify({ content: docDraft })
+      })
+      const data = await response.json()
+      if (data.success) {
+        setDocContent(docDraft)
+        setIsEditingDoc(false)
+      }
+    } catch (error) {
+      console.error('Failed to save documentation:', error)
+    } finally {
+      setDocSaving(false)
     }
   }
 
@@ -272,10 +301,58 @@ export default function TaskModal({ isOpen, onClose, onSave, onDelete, task }: T
 
           {showDocPanel && (
             <div className="mt-6 pt-6 border-t">
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-sm font-medium text-muted-foreground">Documentation</span>
+                {!docLoading && (
+                  isEditingDoc ? (
+                    <div className="flex gap-2">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setIsEditingDoc(false)}
+                        disabled={docSaving}
+                      >
+                        <X className="h-3 w-3 mr-1" />
+                        Cancel
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        onClick={saveDocumentation}
+                        disabled={docSaving}
+                      >
+                        {docSaving ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <Save className="h-3 w-3 mr-1" />}
+                        Save
+                      </Button>
+                    </div>
+                  ) : (
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        setDocDraft(docContent)
+                        setIsEditingDoc(true)
+                      }}
+                    >
+                      <Pencil className="h-3 w-3 mr-1" />
+                      Edit
+                    </Button>
+                  )
+                )}
+              </div>
               {docLoading ? (
                 <div className="flex items-center justify-center py-8">
                   <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
                 </div>
+              ) : isEditingDoc ? (
+                <Textarea
+                  value={docDraft}
+                  onChange={(e) => setDocDraft(e.target.value)}
+                  className="min-h-[300px] font-mono text-sm"
+                  placeholder="Write markdown documentation here..."
+                />
               ) : docContent ? (
                 <div className="max-w-none space-y-3 text-sm text-foreground
                   [&_h1]:text-2xl [&_h1]:font-bold [&_h1]:mb-3
