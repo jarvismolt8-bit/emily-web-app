@@ -8,7 +8,6 @@ const path = require('path');
 const envFile = process.env.NODE_ENV === 'staging' ? '.env.staging' : '.env';
 require('dotenv').config({ path: require('path').join(__dirname, envFile) });
 
-const features = require('./config/features');
 const { getDb } = require('./db');
 getDb();
 
@@ -30,7 +29,6 @@ const imageRenamerRoutes = require('./routes/image-renamer');
 const cashflowRepo = require('./repositories/cashflow.repository');
 const tasksRepo = require('./repositories/tasks.repository');
 const { logActivity } = require('./utils/activity-logger');
-const { logLoginAttempt } = require('./utils/security-logger');
 
 const securityMiddleware = require('./middleware/security');
 const authMiddleware = require('./middleware/authentication');
@@ -47,7 +45,6 @@ const { verifyApiKey } = require('./routes/v1/api-key');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
-const WEB_PASSWORD = process.env.WEB_PASSWORD;
 
 const filterStore = new Map();
 
@@ -102,17 +99,6 @@ app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument, {
   customSiteTitle: 'Cashflow Manager API Docs'
 }));
 
-const verifyPassword = (req, res, next) => {
-  const authHeader = req.headers['x-password'];
-  if (authHeader === WEB_PASSWORD) {
-    logLoginAttempt(req, true);
-    next();
-  } else {
-    logLoginAttempt(req, false);
-    res.status(401).json({ error: 'Unauthorized' });
-  }
-};
-
 // Health endpoint
 app.get('/api/v1/health', (req, res) => {
   res.json({
@@ -124,25 +110,13 @@ app.get('/api/v1/health', (req, res) => {
   });
 });
 
-// Legacy v1 routes using X-Password (for production deployment)
-const verifyLegacyPassword = (req, res, next) => {
-  const authHeader = req.headers['x-password'];
-  if (authHeader === WEB_PASSWORD) {
-    logLoginAttempt(req, true);
-    next();
-  } else {
-    logLoginAttempt(req, false);
-    res.status(401).json({ error: 'Unauthorized' });
-  }
-};
-
 // Auth routes — always available
 app.use('/api/v1/auth', securityMiddleware.loginRateLimiter, authV1Routes);
 
 // API key routes — requires JWT authentication
 app.use('/api/v1/api-key', authMiddleware.verifyAccessToken, apiKeyRoutes);
 
-// Unified auth middleware — JWT, API key, or legacy X-Password
+// Unified auth middleware — JWT or API key (also accepts token query param for SSE)
 const verifyJwtOrApiKey = (req, res, next) => {
   if (req.headers.authorization && req.headers.authorization.startsWith('Bearer ')) {
     return authMiddleware.verifyAccessToken(req, res, next);
@@ -150,9 +124,9 @@ const verifyJwtOrApiKey = (req, res, next) => {
   if (req.headers['x-api-key']) {
     return verifyApiKey(req, res, next);
   }
-  if (features.legacyPasswordEnabled) {
-    const pw = req.headers['x-password'];
-    if (pw && pw === process.env.WEB_PASSWORD) return next();
+  if (req.query.token) {
+    req.headers.authorization = `Bearer ${req.query.token}`;
+    return authMiddleware.verifyAccessToken(req, res, next);
   }
   return res.status(401).json({ error: 'Authentication required' });
 };
@@ -162,9 +136,6 @@ app.use('/api/v1/tasks', securityMiddleware.apiRateLimiter, verifyJwtOrApiKey, t
 app.use('/api/v1/activity-logs', securityMiddleware.apiRateLimiter, verifyJwtOrApiKey, activityLogsV1Routes);
 
 app.use('/api/image-renamer', securityMiddleware.verifyToken, imageRenamerRoutes);
-
-
-app.use('/api/image-renamer', verifyPassword, imageRenamerRoutes);
 
 const deprecationWarning = (req, res, next) => {
   console.log(`[DEPRECATED] ${req.method} ${req.path} - Use /api/v1${req.path.replace('/api', '')} instead`);
@@ -177,7 +148,7 @@ app.use('/api/emily', deprecationWarning);
 app.use('/api/activity-logs', deprecationWarning);
 app.use('/api/summary', deprecationWarning);
 
-app.get('/api/cashflow', verifyPassword, (req, res) => {
+app.get('/api/cashflow', verifyJwtOrApiKey, (req, res) => {
   try {
     const { category, currency, startDate, endDate, search } = req.query;
     const data = cashflowRepo.findAll({ category, currency, startDate, endDate, search });
@@ -187,7 +158,7 @@ app.get('/api/cashflow', verifyPassword, (req, res) => {
   }
 });
 
-app.get('/api/summary', verifyPassword, (req, res) => {
+app.get('/api/summary', verifyJwtOrApiKey, (req, res) => {
   try {
     const summary = cashflowRepo.getSummary();
     res.json(summary);
@@ -196,7 +167,7 @@ app.get('/api/summary', verifyPassword, (req, res) => {
   }
 });
 
-app.post('/api/cashflow', verifyPassword, (req, res) => {
+app.post('/api/cashflow', verifyJwtOrApiKey, (req, res) => {
   try {
     const source = req.body.source || 'web_app';
     const newEntry = cashflowRepo.create(req.body, source);
@@ -229,7 +200,7 @@ app.post('/api/cashflow', verifyPassword, (req, res) => {
   }
 });
 
-app.put('/api/cashflow/:id', verifyPassword, (req, res) => {
+app.put('/api/cashflow/:id', verifyJwtOrApiKey, (req, res) => {
   try {
     const source = req.body.source || 'web_app';
     const oldEntry = cashflowRepo.findById(req.params.id);
@@ -275,7 +246,7 @@ app.put('/api/cashflow/:id', verifyPassword, (req, res) => {
   }
 });
 
-app.delete('/api/cashflow/:id', verifyPassword, (req, res) => {
+app.delete('/api/cashflow/:id', verifyJwtOrApiKey, (req, res) => {
   try {
     const source = req.query.source || 'web_app';
     const deletedEntry = cashflowRepo.delete(req.params.id, source);
@@ -318,7 +289,7 @@ app.delete('/api/cashflow/:id', verifyPassword, (req, res) => {
   }
 });
 
-app.get('/api/tasks', verifyPassword, (req, res) => {
+app.get('/api/tasks', verifyJwtOrApiKey, (req, res) => {
   try {
     const tasks = tasksRepo.findAll({});
     res.json(tasks);
@@ -327,7 +298,7 @@ app.get('/api/tasks', verifyPassword, (req, res) => {
   }
 });
 
-app.post('/api/tasks', verifyPassword, (req, res) => {
+app.post('/api/tasks', verifyJwtOrApiKey, (req, res) => {
   try {
     const source = req.body.source || 'web_app';
     const newTask = tasksRepo.create(req.body, source);
@@ -360,7 +331,7 @@ app.post('/api/tasks', verifyPassword, (req, res) => {
   }
 });
 
-app.put('/api/tasks/:id', verifyPassword, (req, res) => {
+app.put('/api/tasks/:id', verifyJwtOrApiKey, (req, res) => {
   try {
     const source = req.body.source || 'web_app';
     const oldTask = tasksRepo.findById(req.params.id);
@@ -406,7 +377,7 @@ app.put('/api/tasks/:id', verifyPassword, (req, res) => {
   }
 });
 
-app.delete('/api/tasks/:id', verifyPassword, (req, res) => {
+app.delete('/api/tasks/:id', verifyJwtOrApiKey, (req, res) => {
   try {
     const source = req.query.source || 'web_app';
     const deletedTask = tasksRepo.delete(req.params.id, source);
@@ -451,7 +422,7 @@ app.delete('/api/tasks/:id', verifyPassword, (req, res) => {
 
 const activityRepo = require('./repositories/activity.repository');
 
-app.get('/api/activity-logs', verifyPassword, (req, res) => {
+app.get('/api/activity-logs', verifyJwtOrApiKey, (req, res) => {
   try {
     const { search, action_type, date_from, date_to, status, source } = req.query;
     const logs = activityRepo.findAll({ search, action_type, date_from, date_to, status, source });
@@ -465,7 +436,7 @@ app.get('/api/activity-logs', verifyPassword, (req, res) => {
   }
 });
 
-app.get('/api/activity-logs/stats', verifyPassword, (req, res) => {
+app.get('/api/activity-logs/stats', verifyJwtOrApiKey, (req, res) => {
   try {
     const stats = activityRepo.getStats();
     res.json(stats);
@@ -474,7 +445,7 @@ app.get('/api/activity-logs/stats', verifyPassword, (req, res) => {
   }
 });
 
-app.post('/api/activity-logs', verifyPassword, (req, res) => {
+app.post('/api/activity-logs', verifyJwtOrApiKey, (req, res) => {
   try {
     const { action_type, description, details, status, error_message, source, actor } = req.body;
 
@@ -496,11 +467,7 @@ app.post('/api/activity-logs', verifyPassword, (req, res) => {
 
 const sseClients = new Set();
 
-app.get('/api/v1/events', (req, res) => {
-  const password = req.query.password || req.headers['x-password'];
-  if (password !== WEB_PASSWORD) {
-    return res.status(401).json({ error: 'Unauthorized' });
-  }
+app.get('/api/v1/events', verifyJwtOrApiKey, (req, res) => {
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Connection', 'keep-alive');
@@ -546,7 +513,7 @@ eventBus.on('task:deleted', (payload) => broadcastSSE('task:deleted', payload));
 eventBus.on('cashflow:filter', (payload) => broadcastSSE('cashflow:filter', payload));
 eventBus.on('task:filter', (payload) => broadcastSSE('task:filter', payload));
 
-app.post('/api/emily/tasks/create', verifyPassword, (req, res) => {
+app.post('/api/emily/tasks/create', verifyJwtOrApiKey, (req, res) => {
   try {
     const { name, priority, date, time, source } = req.body;
 
@@ -588,7 +555,7 @@ app.post('/api/emily/tasks/create', verifyPassword, (req, res) => {
   }
 });
 
-app.post('/api/emily/tasks/update/:id', verifyPassword, (req, res) => {
+app.post('/api/emily/tasks/update/:id', verifyJwtOrApiKey, (req, res) => {
   try {
     const { name, priority, date, time, source } = req.body;
     const taskId = req.params.id;
@@ -633,7 +600,7 @@ app.post('/api/emily/tasks/update/:id', verifyPassword, (req, res) => {
   }
 });
 
-app.post('/api/emily/tasks/delete/:id', verifyPassword, (req, res) => {
+app.post('/api/emily/tasks/delete/:id', verifyJwtOrApiKey, (req, res) => {
   try {
     const taskId = req.params.id;
     const { source } = req.body;
@@ -673,7 +640,7 @@ app.post('/api/emily/tasks/delete/:id', verifyPassword, (req, res) => {
   }
 });
 
-app.post('/api/emily/tasks/delete-by-name', verifyPassword, (req, res) => {
+app.post('/api/emily/tasks/delete-by-name', verifyJwtOrApiKey, (req, res) => {
   try {
     const { task_name, source } = req.body;
     const taskSource = source || 'telegram';

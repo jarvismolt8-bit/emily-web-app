@@ -1,5 +1,7 @@
 import { useEffect, useRef, useCallback } from 'react'
 
+const ACCESS_TOKEN_KEY = 'cashflow_access_token';
+
 export interface SSEEvent {
   type: string
   data: any
@@ -23,8 +25,13 @@ export function useSSE(onEvent: (event: SSEEvent) => void) {
       eventSourceRef.current.close()
     }
 
-    const password = import.meta.env.VITE_PASSWORD
-    const url = `/api/v1/events?password=${encodeURIComponent(password)}`
+    const accessToken = localStorage.getItem(ACCESS_TOKEN_KEY)
+    if (!accessToken) {
+      console.warn('[SSE] No access token available')
+      return
+    }
+    
+    const url = `/api/v1/events?token=${encodeURIComponent(accessToken)}`
     
     const eventSource = new EventSource(url)
     eventSourceRef.current = eventSource
