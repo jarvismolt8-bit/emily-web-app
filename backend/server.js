@@ -475,7 +475,7 @@ app.post('/api/activity-logs', verifyJwtOrApiKey, (req, res) => {
 
 const sseClients = new Set();
 
-app.get('/api/v1/events', securityMiddleware.sseRateLimiter, verifyJwtOrApiKey, (req, res) => {
+app.get('/api/v1/events', verifyJwtOrApiKey, (req, res) => {
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Connection', 'keep-alive');
