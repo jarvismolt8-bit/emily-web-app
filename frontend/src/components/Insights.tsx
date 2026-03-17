@@ -33,9 +33,20 @@ export default function Insights() {
 
     const eventSource = new EventSource(`${import.meta.env.VITE_API_URL || '/api/v1'}/events?token=${encodeURIComponent(accessToken)}`)
 
-    eventSource.addEventListener('insights:created', () => {
-      fetchSessions()
-    })
+    eventSource.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data)
+        if (data.type === 'insights:created') {
+          fetchSessions()
+        }
+      } catch (err) {
+        console.error('[Insights] SSE parse error:', err)
+      }
+    }
+
+    eventSource.onerror = () => {
+      eventSource.close()
+    }
 
     return () => {
       eventSource.close()
