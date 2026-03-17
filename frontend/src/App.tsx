@@ -7,6 +7,7 @@ import FilterBar from './components/FilterBar'
 import CashflowTable from './components/CashflowTable'
 import Tasks from './components/Tasks'
 import ActivityLogs from './components/ActivityLogs'
+import Insights from './components/Insights'
 import ImageRenamer from './components/ImageRenamer'
 import ChatWidget from './components/ChatWidget'
 import CashflowFormModal from './components/CashflowFormModal'
@@ -15,7 +16,7 @@ import { useRealtimeCashflow } from './hooks/useRealtimeData'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
 import { ThemeToggle } from './components/ThemeToggle'
-import { LogOut, Wallet, ListTodo, Activity, Image, MessageCircle } from 'lucide-react'
+import { LogOut, Wallet, ListTodo, Activity, Image, MessageCircle, BarChart2 } from 'lucide-react'
 import { TooltipProvider } from '@/components/ui/tooltip'
 
 interface Filters {
@@ -236,6 +237,10 @@ const [filters, setFilters] = useState<Filters>({
                   <ListTodo className="h-4 w-4" />
                   Tasks
                 </TabsTrigger>
+                <TabsTrigger value="insights" className="gap-2">
+                  <BarChart2 className="h-4 w-4" />
+                  Insights
+                </TabsTrigger>
                 <TabsTrigger value="logs" className="gap-2">
                   <Activity className="h-4 w-4" />
                   Logs
@@ -254,6 +259,10 @@ const [filters, setFilters] = useState<Filters>({
 
               <TabsContent value="tasks" className="mt-6">
                 <Tasks />
+              </TabsContent>
+
+              <TabsContent value="insights" className="mt-6">
+                <Insights />
               </TabsContent>
 
               <TabsContent value="logs" className="mt-6">
