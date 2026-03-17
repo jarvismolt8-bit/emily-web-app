@@ -54,6 +54,12 @@ const unauthenticatedLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, max: 50
 });
 
+const sseLimiter = rateLimit({
+  windowMs: 60 * 1000, max: 100,
+  message: { error: 'Too many SSE connections' },
+  standardHeaders: true, legacyHeaders: false
+});
+
 const verifyToken = (req, res, next) => next();
 
 module.exports = {
@@ -64,5 +70,6 @@ module.exports = {
   registerLimiter,
   refreshLimiter,
   unauthenticatedLimiter,
+  sseLimiter,
   verifyToken
 };
