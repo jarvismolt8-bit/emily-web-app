@@ -103,7 +103,8 @@ router.post('/', (req, res) => {
 
     const existing = insightsRepository.findSessionById(session_id);
     if (existing) {
-      return res.status(409).json({ error: 'Session already exists', session_id });
+      // Delete existing session and charts to allow recreation
+      insightsRepository.deleteSession(session_id);
     }
 
     insightsRepository.createSession({
