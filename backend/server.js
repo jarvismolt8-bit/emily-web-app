@@ -48,6 +48,9 @@ const { verifyApiKey } = require('./routes/v1/api-key');
 const app = express();
 const PORT = process.env.PORT || 3001;
 
+// Trust proxy for rate limiter (handles X-Forwarded-For correctly)
+app.set('trust proxy', 1);
+
 const filterStore = new Map();
 
 module.exports = { app, filterStore };
