@@ -5,6 +5,7 @@ const WebSocket = require('ws');
 const swaggerUi = require('swagger-ui-express');
 const YAML = require('yamljs');
 const path = require('path');
+const cron = require('node-cron');
 const envFile = process.env.NODE_ENV === 'staging' ? '.env.staging' : '.env';
 require('dotenv').config({ path: require('path').join(__dirname, envFile) });
 
@@ -41,6 +42,7 @@ const { logAuthEvent } = require('./middleware/audit');
 const { requireNotLocked } = require('./middleware/accountLockout');
 const { requirePermission } = require('./middleware/permissions');
 const apiKeyRoutes = require('./routes/v1/api-key');
+const insightsV1Routes = require('./routes/v1/insights');
 const { verifyApiKey } = require('./routes/v1/api-key');
 
 const app = express();
@@ -134,6 +136,9 @@ const verifyJwtOrApiKey = (req, res, next) => {
 app.use('/api/v1/cashflow', securityMiddleware.apiRateLimiter, verifyJwtOrApiKey, cashflowV1Routes);
 app.use('/api/v1/tasks', securityMiddleware.apiRateLimiter, verifyJwtOrApiKey, tasksV1Routes);
 app.use('/api/v1/activity-logs', securityMiddleware.apiRateLimiter, verifyJwtOrApiKey, activityLogsV1Routes);
+
+// Insights: POST requires X-API-Key, GET/DELETE requires JWT or X-API-Key
+app.use('/api/v1/insights', verifyApiKey, insightsV1Routes);
 
 app.use('/api/image-renamer', securityMiddleware.verifyToken, imageRenamerRoutes);
 
@@ -467,7 +472,7 @@ app.post('/api/activity-logs', verifyJwtOrApiKey, (req, res) => {
 
 const sseClients = new Set();
 
-app.get('/api/v1/events', verifyJwtOrApiKey, (req, res) => {
+app.get('/api/v1/events', securityMiddleware.sseRateLimiter, verifyJwtOrApiKey, (req, res) => {
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Connection', 'keep-alive');
@@ -512,6 +517,7 @@ eventBus.on('task:deleted', (payload) => broadcastSSE('task:deleted', payload));
 
 eventBus.on('cashflow:filter', (payload) => broadcastSSE('cashflow:filter', payload));
 eventBus.on('task:filter', (payload) => broadcastSSE('task:filter', payload));
+eventBus.on('insights:created', (payload) => broadcastSSE('insights:created', payload));
 
 app.post('/api/emily/tasks/create', verifyJwtOrApiKey, (req, res) => {
   try {
@@ -866,6 +872,18 @@ server.listen(PORT, () => {
   // console.log(`WebSocket chat available at ws://localhost:${PORT}/api/chat`);
   console.log(`WebSocket chat DISABLED - TEMPORARILY`);
   console.log(`SQLite database at ${process.env.DATABASE_PATH}`);
+
+  // Daily cleanup: delete tasks archived > 30 days ago
+  cron.schedule('0 0 * * *', () => {
+    try {
+      const deleted = tasksRepo.deleteExpiredArchived();
+      if (deleted > 0) {
+        console.log(`[cron] Deleted ${deleted} expired archived task(s)`);
+      }
+    } catch (err) {
+      console.error('[cron] Archive cleanup failed:', err.message);
+    }
+  });
 });
 
 process.on('SIGTERM', () => {
