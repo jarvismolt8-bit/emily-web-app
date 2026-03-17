@@ -141,7 +141,7 @@ app.use('/api/v1/tasks', securityMiddleware.apiRateLimiter, verifyJwtOrApiKey, t
 app.use('/api/v1/activity-logs', securityMiddleware.apiRateLimiter, verifyJwtOrApiKey, activityLogsV1Routes);
 
 // Insights: POST requires X-API-Key, GET/DELETE requires JWT or X-API-Key
-app.use('/api/v1/insights', verifyApiKey, insightsV1Routes);
+app.use('/api/v1/insights', verifyJwtOrApiKey, insightsV1Routes);
 
 app.use('/api/image-renamer', securityMiddleware.verifyToken, imageRenamerRoutes);
 
