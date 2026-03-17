@@ -25,7 +25,13 @@ export default function Insights() {
   useEffect(() => {
     fetchSessions()
 
-    const eventSource = new EventSource(`${import.meta.env.VITE_API_URL || '/api/v1'}/events`)
+    const accessToken = localStorage.getItem('cashflow_access_token')
+    if (!accessToken) {
+      console.warn('[Insights] No access token for SSE')
+      return
+    }
+
+    const eventSource = new EventSource(`${import.meta.env.VITE_API_URL || '/api/v1'}/events?token=${encodeURIComponent(accessToken)}`)
 
     eventSource.addEventListener('insights:created', () => {
       fetchSessions()
