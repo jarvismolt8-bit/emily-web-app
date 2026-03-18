@@ -16,7 +16,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 
-const CATEGORIES = ['Income', 'Investment', 'Food', 'Pet Food', 'Transport', 'Utilities', 'Shopping', 'Entertainment', 'Health', 'Airbnb', 'Other', 'Clothing']
+const CATEGORIES = ['Income', 'Investment', 'Food', 'Pet Food', 'Transport', 'Utilities', 'Shopping', 'Entertainment', 'Health', 'Airbnb', 'Bank', 'Other', 'Clothing']
 const CURRENCIES = ['PHP', 'USD', 'EUR']
 
 interface CashflowEntry {

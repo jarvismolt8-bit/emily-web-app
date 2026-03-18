@@ -22,7 +22,8 @@ const CATEGORY_EMOJIS: Record<string, string> = {
   'Health': '💊',
   'Airbnb': '🛌',
   'Other': '📦',
-  'Clothing': '👕'
+  'Clothing': '👕',
+  'Bank': '🏦'
 }
 
 const CURRENCY_SYMBOLS: Record<string, string> = {
