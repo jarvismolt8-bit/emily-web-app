@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { fetchWithAuth, getAccessToken } from '../api/auth'
 import { format, parse } from 'date-fns'
 import ReactMarkdown from 'react-markdown'
 import {
@@ -21,11 +22,12 @@ import {
 import { Textarea } from '@/components/ui/textarea'
 import { Trash2, Loader2, Pencil, X, Save } from 'lucide-react'
 
-const STATUSES = ['backlog', 'in_progress', 'done']
+const STATUSES = ['backlog', 'in_progress', 'done', 'archive']
 const STATUS_LABELS: Record<string, string> = {
   'backlog': 'Backlog',
   'in_progress': 'In Progress',
-  'done': 'Done'
+  'done': 'Done',
+  'archive': 'Archive'
 }
 const PRIORITIES = ['low', 'medium', 'high']
 
@@ -115,9 +117,9 @@ export default function TaskModal({ isOpen, onClose, onSave, onDelete, task }: T
   const fetchDocumentation = async (taskId: string) => {
     setDocLoading(true)
     try {
-      const response = await fetch(`${API_BASE}/tasks/${taskId}/documentation`, {
+      const response = await fetchWithAuth(`${API_BASE}/tasks/${taskId}/documentation`, {
         headers: {
-          'X-Password': '10716255',
+          'Authorization': `Bearer ${getAccessToken()}`,
           'X-Source': 'web_app'
         }
       })
@@ -139,11 +141,11 @@ export default function TaskModal({ isOpen, onClose, onSave, onDelete, task }: T
     if (!task?.id) return
     setDocSaving(true)
     try {
-      const response = await fetch(`${API_BASE}/tasks/${task.id}/documentation`, {
+      const response = await fetchWithAuth(`${API_BASE}/tasks/${task.id}/documentation`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'X-Password': '10716255',
+          'Authorization': `Bearer ${getAccessToken()}`,
           'X-Source': 'web_app'
         },
         body: JSON.stringify({ content: docDraft })

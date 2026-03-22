@@ -25,7 +25,8 @@ const PRIORITY_COLORS: Record<string, string> = {
 const STATUS_CONFIG: Record<string, { label: string; variant: 'outline' | 'secondary' | 'default' }> = {
   'backlog': { label: 'Backlog', variant: 'outline' },
   'in_progress': { label: 'In Progress', variant: 'secondary' },
-  'done': { label: 'Done', variant: 'default' }
+  'done': { label: 'Done', variant: 'default' },
+  'archive': { label: 'Archive', variant: 'outline' }
 }
 
 interface Task {
@@ -34,7 +35,7 @@ interface Task {
   description?: string
   date?: string
   time?: string
-  status: 'backlog' | 'in_progress' | 'done'
+  status: 'backlog' | 'in_progress' | 'done' | 'archive'
   priority: 'high' | 'medium' | 'low'
 }
 
@@ -59,7 +60,7 @@ function SortIndicator({ field, currentField, currentOrder }: { field: SortField
   return <span className="ml-1">{currentOrder === 'asc' ? '▲' : '▼'}</span>
 }
 
-const STATUS_ORDER = ['backlog', 'in_progress', 'done']
+const STATUS_ORDER = ['backlog', 'in_progress', 'done', 'archive']
 
 function StatusIndicator({ status }: { status: string | null }) {
   return <span className="ml-1 text-muted-foreground/50">▼</span>
@@ -74,6 +75,8 @@ export default function TaskTable({ tasks, onEdit, onDelete, sortBy, sortOrder, 
       onStatusFilter('in_progress')
     } else if (statusFilter === 'in_progress') {
       onStatusFilter('done')
+    } else if (statusFilter === 'done') {
+      onStatusFilter('archive')
     } else {
       onStatusFilter(null)
     }

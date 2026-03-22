@@ -15,7 +15,7 @@ interface Task {
   description?: string
   date?: string
   time?: string
-  status: 'backlog' | 'in_progress' | 'done'
+  status: 'backlog' | 'in_progress' | 'done' | 'archive'
   priority: 'high' | 'medium' | 'low'
 }
 
