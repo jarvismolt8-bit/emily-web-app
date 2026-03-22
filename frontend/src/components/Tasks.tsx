@@ -7,7 +7,9 @@ import TaskModal from './TaskModal'
 import TaskKanban from './TaskKanban'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Plus, LayoutGrid, List } from 'lucide-react'
+import { Plus, LayoutGrid, List, Settings } from 'lucide-react'
+import { Switch } from '@/components/ui/switch'
+import { Label } from '@/components/ui/label'
 
 interface Task {
   id: string
@@ -15,7 +17,7 @@ interface Task {
   description?: string
   date?: string
   time?: string
-  status: 'backlog' | 'in_progress' | 'done'
+  status: 'backlog' | 'in_progress' | 'done' | 'archive'
   priority: 'high' | 'medium' | 'low'
 }
 
@@ -45,6 +47,8 @@ export default function Tasks({ showAddButton = true }: TasksProps) {
   const [statusFilter, setStatusFilter] = useState<string | null>(null)
   const [priorityFilter, setPriorityFilter] = useState<string | null>(null)
   const [searchFilter, setSearchFilter] = useState<string>('')
+  const [showArchive, setShowArchive] = useState(true)
+  const [settingsOpen, setSettingsOpen] = useState(false)
 
   const fetchTasks = useCallback(async () => {
     const applyFilters = viewMode === 'table'
@@ -160,12 +164,35 @@ export default function Tasks({ showAddButton = true }: TasksProps) {
           </TabsList>
         </Tabs>
         
-        {showAddButton && (
-          <Button onClick={handleAdd} size="sm">
-            <Plus className="h-4 w-4 mr-1.5" />
-            Add Task
-          </Button>
-        )}
+        <div className="flex items-center gap-2">
+          {viewMode === 'kanban' && (
+            <>
+              {settingsOpen && (
+                <div className="flex items-center gap-2 px-3 py-1.5 rounded-md border bg-background text-sm">
+                  <Label htmlFor="show-archive" className="cursor-pointer whitespace-nowrap">Show Archive</Label>
+                  <Switch
+                    id="show-archive"
+                    checked={showArchive}
+                    onCheckedChange={setShowArchive}
+                  />
+                </div>
+              )}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setSettingsOpen(v => !v)}
+              >
+                <Settings className="h-4 w-4" />
+              </Button>
+            </>
+          )}
+          {showAddButton && (
+            <Button onClick={handleAdd} size="sm">
+              <Plus className="h-4 w-4 mr-1.5" />
+              Add Task
+            </Button>
+          )}
+        </div>
       </div>
 
       {loading ? (
@@ -182,10 +209,11 @@ export default function Tasks({ showAddButton = true }: TasksProps) {
           onStatusFilter={setStatusFilter}
         />
       ) : (
-        <TaskKanban 
-          tasks={tasks} 
-          onEdit={handleEdit} 
+        <TaskKanban
+          tasks={tasks}
+          onEdit={handleEdit}
           onStatusChange={handleStatusChange}
+          showArchive={showArchive}
         />
       )}
 

@@ -24,7 +24,7 @@ import { CSS } from '@dnd-kit/utilities'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 
-type TaskStatus = 'backlog' | 'in_progress' | 'done'
+type TaskStatus = 'backlog' | 'in_progress' | 'done' | 'archive'
 
 interface Task {
   id: string
@@ -40,6 +40,7 @@ interface TaskKanbanProps {
   tasks: Task[]
   onEdit: (task: Task) => void
   onStatusChange: (taskId: string, newStatus: TaskStatus) => void
+  showArchive?: boolean
 }
 
 interface Column {
@@ -51,6 +52,7 @@ const COLUMNS: Column[] = [
   { id: 'backlog', title: 'Backlog' },
   { id: 'in_progress', title: 'In Progress' },
   { id: 'done', title: 'Done' },
+  { id: 'archive', title: 'Archive' },
 ]
 
 const PRIORITY_COLORS: Record<string, string> = {
@@ -132,7 +134,7 @@ function BoardColumn({ column, tasks, onEdit }: { column: Column; tasks: Task[];
   return (
     <div
       ref={setNodeRef}
-      className={`border rounded-lg p-4 bg-muted/30 min-h-[400px] transition-colors ${isOver ? 'ring-2 ring-primary bg-muted/50' : ''}`}
+      className={`border rounded-lg p-4 bg-muted/30 min-h-[150px] md:min-h-[400px] w-[280px] flex-shrink-0 transition-colors ${isOver ? 'ring-2 ring-primary bg-muted/50' : ''}`}
     >
       <div className="flex items-center justify-between mb-4">
         <h3 className="font-semibold">{column.title}</h3>
@@ -156,7 +158,7 @@ function BoardColumn({ column, tasks, onEdit }: { column: Column; tasks: Task[];
   )
 }
 
-export default function TaskKanban({ tasks, onEdit, onStatusChange }: TaskKanbanProps) {
+export default function TaskKanban({ tasks, onEdit, onStatusChange, showArchive = true }: TaskKanbanProps) {
   const [localTasks, setLocalTasks] = useState<Task[]>(tasks)
   const [activeTask, setActiveTask] = useState<Task | null>(null)
   const isDraggingRef = useRef(false)
@@ -265,20 +267,22 @@ export default function TaskKanban({ tasks, onEdit, onStatusChange }: TaskKanban
     }
   }
 
-  const columnsWithTasks = COLUMNS.map(column => ({
+  const visibleColumns = showArchive ? COLUMNS : COLUMNS.filter(c => c.id !== 'archive')
+  const columnsWithTasks = visibleColumns.map(column => ({
     ...column,
     tasks: localTasks.filter(task => task.status === column.id)
   }))
 
   return (
-    <DndContext
-      sensors={sensors}
-      collisionDetection={pointerWithin}
-      onDragStart={handleDragStart}
-      onDragOver={handleDragOver}
-      onDragEnd={handleDragEnd}
-    >
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+    <div>
+      <DndContext
+        sensors={sensors}
+        collisionDetection={pointerWithin}
+        onDragStart={handleDragStart}
+        onDragOver={handleDragOver}
+        onDragEnd={handleDragEnd}
+      >
+      <div className="flex gap-4 overflow-x-auto pb-2">
         {columnsWithTasks.map(column => (
           <BoardColumn
             key={column.id}
@@ -319,6 +323,7 @@ export default function TaskKanban({ tasks, onEdit, onStatusChange }: TaskKanban
         </DragOverlay>,
         document.body
       )}
-    </DndContext>
+      </DndContext>
+    </div>
   )
 }

@@ -81,6 +81,13 @@ const tasksRepo = {
     }
     if (fields.length === 0) return existing;
 
+    // Auto-manage archived_at on archive status transitions
+    if (data.status === 'archive' && existing.status !== 'archive') {
+      fields.push("archived_at = datetime('now')");
+    } else if (data.status !== undefined && data.status !== 'archive' && existing.status === 'archive') {
+      fields.push("archived_at = NULL");
+    }
+
     fields.push("updated_at = datetime('now')");
     params.push(id);
 
@@ -104,6 +111,14 @@ const tasksRepo = {
     }
     
     return existing;
+  },
+
+  deleteExpiredArchived() {
+    const db = getDb();
+    const result = db.prepare(
+      "DELETE FROM tasks WHERE status = 'archive' AND archived_at IS NOT NULL AND archived_at <= datetime('now', '-30 days')"
+    ).run();
+    return result.changes;
   },
 
   deleteByName(name, source = 'web_app') {

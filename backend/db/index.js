@@ -14,6 +14,14 @@ function getDb() {
     db.pragma('busy_timeout = 5000');
     db.pragma('cache_size = -20000');
     db.pragma('temp_store = MEMORY');
+
+    // Idempotent migration: add archived_at column if missing
+    const cols = db.pragma('table_info(tasks)');
+    const hasArchivedAt = cols.some(c => c.name === 'archived_at');
+    if (!hasArchivedAt) {
+      db.exec('ALTER TABLE tasks ADD COLUMN archived_at TEXT NULL');
+      db.exec("UPDATE tasks SET archived_at = datetime('now') WHERE status = 'archive' AND archived_at IS NULL");
+    }
   }
   return db;
 }
