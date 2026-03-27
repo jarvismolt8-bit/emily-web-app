@@ -20,6 +20,7 @@ const eventBus = require('./events');
 const swaggerDocument = YAML.load(path.join(__dirname, 'swagger.yaml'));
 
 const gatewayClient = require('./gateway-client');
+require('./services/claude-bridge');
 
 const sourceMiddleware = require('./middleware/source');
 const cashflowV1Routes = require('./routes/v1/cashflow');
@@ -116,7 +117,7 @@ app.get('/api/v1/health', (req, res) => {
 });
 
 // Auth routes — always available
-app.use('/api/v1/auth', securityMiddleware.loginRateLimiter, authV1Routes);
+app.use('/api/v1/auth', authV1Routes);
 
 // API key routes — requires JWT authentication
 app.use('/api/v1/api-key', authMiddleware.verifyAccessToken, apiKeyRoutes);
