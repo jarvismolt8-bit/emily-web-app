@@ -1,31 +1,31 @@
-const fs = require('fs');
-const path = require('path');
 const { execFile } = require('child_process');
 
-const BRIDGE_DIR = '/tmp/claude-bridge';
-const LOG_PATH = path.join(BRIDGE_DIR, 'output.log');
 // Use 'claude:' (trailing colon) to force tmux to match the SESSION named 'claude'
 // rather than a window named 'claude' inside the current session.
 const TMUX_TARGET = 'claude:';
 const MAX_MESSAGE_LENGTH = 4000;
 const MAX_OUTPUT_LENGTH = 16384;
-const IDLE_POLL_INTERVAL = 500;
+const IDLE_POLL_INTERVAL = 1000;
 const IDLE_CONFIRMATIONS_NEEDED = 2;
-const HARD_TIMEOUT = 90000;
+const HARD_TIMEOUT = 120000;
+
+// Claude Code's animated TUI requires broader ANSI stripping
+const STRIP_ANSI = /\x1B\[[0-9;?]*[A-Za-z]|\x1B[()][AB012]|\x1B[^[\]]/g;
+
+// Claude Code shows these patterns while generating a response
+const PROCESSING_PATTERN = /\u2026|\bThinking\b|\bGenerating\b|\bCerebrating\b|\bRunning\b|\bArchitecting\b|\bPlanning\b|\bAnalyz/i;
+
+// Claude Code's idle input prompt
+const PROMPT_CHAR = '\u276F'; // ❯
 
 let _queue = [];
 let _busy = false;
-let _pipePaneAttached = false;
 
 function log(level, msg) {
   const prefix = '[claude-bridge]';
-  if (level === 'error') {
-    console.error(`${prefix} ERROR: ${msg}`);
-  } else if (level === 'warn') {
-    console.warn(`${prefix} WARNING: ${msg}`);
-  } else {
-    console.log(`${prefix} ${msg}`);
-  }
+  if (level === 'error') console.error(`${prefix} ERROR: ${msg}`);
+  else if (level === 'warn') console.warn(`${prefix} WARNING: ${msg}`);
+  else console.log(`${prefix} ${msg}`);
 }
 
 function sanitizeInput(input) {
@@ -40,38 +40,9 @@ function sanitizeInput(input) {
     .substring(0, MAX_MESSAGE_LENGTH);
 }
 
-function stripAnsi(str) {
-  return str.replace(/\x1B\[[0-9;]*[A-Za-z]/g, '').replace(/[\r\n]+$/, '');
-}
-
-function ensureDirectory() {
-  try {
-    fs.mkdirSync(BRIDGE_DIR, { recursive: true, mode: 0o700 });
-  } catch (err) {
-    if (err.code !== 'EEXIST') throw err;
-  }
-}
-
-function truncateLog() {
-  try {
-    fs.writeFileSync(LOG_PATH, '', { flag: 'w' });
-  } catch (err) {
-    log('error', `Failed to truncate log: ${err.message}`);
-  }
-}
-
 function checkSession() {
   return new Promise((resolve) => {
     execFile('tmux', ['display-message', '-t', TMUX_TARGET, '-p', '#{session_name}'], (err) => {
-      resolve(!err);
-    });
-  });
-}
-
-function attachPipePane() {
-  return new Promise((resolve) => {
-    execFile('tmux', ['pipe-pane', '-t', TMUX_TARGET, '-o', `cat >> ${LOG_PATH}`], (err) => {
-      _pipePaneAttached = true;
       resolve(!err);
     });
   });
@@ -86,91 +57,83 @@ function sendKeys(text) {
   });
 }
 
-function capturePane() {
+// Poll capture-pane until Claude Code shows the ❯ idle prompt without processing indicators
+function waitForPrompt() {
   return new Promise((resolve, reject) => {
-    execFile('tmux', ['capture-pane', '-t', TMUX_TARGET, '-p', '-S', '-50'], (err, stdout) => {
-      if (err) reject(err);
-      else resolve(stdout);
-    });
-  });
-}
-
-function getCurrentCommand() {
-  return new Promise((resolve) => {
-    execFile('tmux', ['display-message', '-t', TMUX_TARGET, '-p', '#{pane_current_command}'], (err, stdout) => {
-      if (err) resolve(null);
-      else resolve(stdout.trim());
-    });
-  });
-}
-
-function getLogOffset() {
-  try {
-    const stats = fs.statSync(LOG_PATH);
-    return stats.size;
-  } catch {
-    return 0;
-  }
-}
-
-function readFromOffset(offset) {
-  try {
-    const fd = fs.openSync(LOG_PATH, 'r');
-    const stats = fs.fstatSync(fd);
-    const len = stats.size - offset;
-    if (len <= 0) {
-      fs.closeSync(fd);
-      return '';
-    }
-    const buf = Buffer.alloc(len);
-    fs.readSync(fd, buf, 0, len, offset);
-    fs.closeSync(fd);
-    let content = buf.toString('utf8');
-    content = stripAnsi(content);
-    content = content.replace(/^\[Emily\]:.*$/m, '').trim();
-    if (content.length > MAX_OUTPUT_LENGTH) {
-      content = content.substring(0, MAX_OUTPUT_LENGTH) + '\n[...truncated]';
-    }
-    return content;
-  } catch {
-    return '';
-  }
-}
-
-function waitForIdle(startOffset) {
-  return new Promise((resolve, reject) => {
-    let idleCount = 0;
-    let lastOutputSize = startOffset;
+    let promptCount = 0;
     const startTime = Date.now();
+
+    // Give Claude a moment to receive the input and start processing
+    setTimeout(poll, 2000);
 
     function poll() {
       if (Date.now() - startTime > HARD_TIMEOUT) {
-        reject(new Error('timeout after 90s'));
+        reject(new Error('timeout after 120s'));
         return;
       }
 
-      getCurrentCommand().then((cmd) => {
-        const currentSize = getLogOffset();
-        const outputGrowing = currentSize > lastOutputSize;
-        lastOutputSize = currentSize;
-
-        const isIdle = (cmd === 'claude' || cmd === 'bash' || cmd === 'sh') && !outputGrowing;
-
-        if (isIdle) {
-          idleCount++;
-        } else {
-          idleCount = 0;
+      execFile('tmux', ['capture-pane', '-t', TMUX_TARGET, '-p'], (err, stdout) => {
+        if (err) {
+          reject(err);
+          return;
         }
 
-        if (idleCount >= IDLE_CONFIRMATIONS_NEEDED) {
+        const text = stdout.replace(STRIP_ANSI, '');
+        const tail = text.split('\n').slice(-15).join('\n');
+
+        const hasPrompt = tail.includes(PROMPT_CHAR);
+        const isProcessing = PROCESSING_PATTERN.test(tail);
+
+        if (hasPrompt && !isProcessing) {
+          promptCount++;
+        } else {
+          promptCount = 0;
+        }
+
+        if (promptCount >= IDLE_CONFIRMATIONS_NEEDED) {
           resolve();
         } else {
           setTimeout(poll, IDLE_POLL_INTERVAL);
         }
       });
     }
+  });
+}
 
-    poll();
+// Capture pane history and extract the response after the last [Emily]: marker
+function captureResponse() {
+  return new Promise((resolve, reject) => {
+    execFile('tmux', ['capture-pane', '-t', TMUX_TARGET, '-p', '-S', '-300'], (err, stdout) => {
+      if (err) {
+        reject(err);
+        return;
+      }
+
+      const text = stdout.replace(STRIP_ANSI, '');
+
+      // Find the last [Emily]: marker
+      const emilyIdx = text.lastIndexOf('[Emily]:');
+      if (emilyIdx === -1) {
+        resolve('');
+        return;
+      }
+
+      // Skip the [Emily]: line itself, collect response lines until ❯ or a separator
+      const lines = text.slice(emilyIdx).split('\n').slice(1);
+      const responseLines = [];
+      for (const line of lines) {
+        const stripped = line.trim();
+        if (stripped.includes(PROMPT_CHAR) || /^[─━═\-]{5,}$/.test(stripped)) break;
+        if (stripped) responseLines.push(stripped);
+      }
+
+      let response = responseLines.join('\n').trim();
+      if (response.length > MAX_OUTPUT_LENGTH) {
+        response = response.substring(0, MAX_OUTPUT_LENGTH) + '\n[...truncated]';
+      }
+
+      resolve(response);
+    });
   });
 }
 
@@ -190,17 +153,10 @@ function processQueue() {
         return;
       }
 
-      if (!_pipePaneAttached) {
-        await attachPipePane();
-      }
-
       const sanitized = sanitizeInput(text);
-      const logOffset = getLogOffset();
       await sendKeys(`[Emily]: ${sanitized}`);
-
-      await waitForIdle(logOffset);
-
-      const output = readFromOffset(logOffset);
+      await waitForPrompt();
+      const output = await captureResponse();
       resolve(output);
     } catch (err) {
       reject(err);
@@ -219,15 +175,9 @@ function sendMessage(text) {
 }
 
 function init() {
-  ensureDirectory();
-  truncateLog();
-
   checkSession().then((exists) => {
     if (exists) {
-      log('info', `log file ready at ${LOG_PATH}`);
-      attachPipePane().then(() => {
-        log('info', 'pipe-pane attached');
-      });
+      log('info', 'claude session ready');
     } else {
       log('warn', 'tmux session "claude" not found — bridge inactive');
     }
