@@ -5,11 +5,9 @@ const claudeBridge = require('./services/claude-bridge');
 function extractClaudePrompt(rawText) {
   if (typeof rawText !== 'string') return null;
   const lower = rawText.toLowerCase();
-  const triggers = ['tell claude ', 'ask claude ', 'claude:'];
-  for (const t of triggers) {
-    const idx = lower.indexOf(t);
-    if (idx !== -1) return rawText.slice(idx + t.length).trim();
-  }
+  const trigger = 'claude-cli:';
+  const idx = lower.indexOf(trigger);
+  if (idx !== -1) return rawText.slice(idx + trigger.length).trim();
   return null;
 }
 
