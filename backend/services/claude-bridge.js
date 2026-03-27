@@ -12,8 +12,11 @@ const HARD_TIMEOUT = 120000;
 // Claude Code's animated TUI requires broader ANSI stripping
 const STRIP_ANSI = /\x1B\[[0-9;?]*[A-Za-z]|\x1B[()][AB012]|\x1B[^[\]]/g;
 
-// Claude Code shows these patterns while generating a response
+// Claude Code shows these patterns while generating a response (used for idle detection)
 const PROCESSING_PATTERN = /\u2026|\bThinking\b|\bGenerating\b|\bCerebrating\b|\bRunning\b|\bArchitecting\b|\bPlanning\b|\bAnalyz/i;
+
+// Lines to strip from captured response — Claude Code spinner words and UI chrome
+const RESPONSE_NOISE = /Prestidigitat|Gesticula|Cerebrat|Zesting|Thinking|Generating|Running|Architecting|Planning|Analyz|accept edits|shift\+tab|esc to interrupt|ctrl\+g|Checking for updates|\/effort|tokens|thought for/i;
 
 // Claude Code's idle input prompt
 const PROMPT_CHAR = '\u276F'; // ❯
@@ -144,7 +147,9 @@ function captureResponse() {
       for (const line of lines) {
         const stripped = line.trim();
         if (stripped.includes(PROMPT_CHAR) || /^[─━═\-]{5,}$/.test(stripped)) break;
-        if (stripped) responseLines.push(stripped);
+        if (!stripped) continue;
+        if (RESPONSE_NOISE.test(stripped)) continue; // skip spinner words and UI chrome
+        responseLines.push(stripped);
       }
 
       let response = responseLines.join('\n').trim();
