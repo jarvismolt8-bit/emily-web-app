@@ -181,8 +181,6 @@ class GatewayClient {
         }
       }
       
-      console.log('[Gateway] Extracted chat text:', text?.substring(0, 100));
-      
       // Broadcast to all clients
       if (text) {
         this.broadcastToAll({
@@ -193,7 +191,7 @@ class GatewayClient {
         });
       }
 
-      // Claude bridge trigger detection
+      // Claude bridge trigger detection (fallback: if message arrives via WebSocket)
       const prompt = extractClaudePrompt(text || '');
       if (prompt) {
         console.log('[Gateway] Claude trigger detected, forwarding to bridge');

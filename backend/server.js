@@ -44,6 +44,7 @@ const { requireNotLocked } = require('./middleware/accountLockout');
 const { requirePermission } = require('./middleware/permissions');
 const apiKeyRoutes = require('./routes/v1/api-key');
 const insightsV1Routes = require('./routes/v1/insights');
+const claudeBridgeRoutes = require('./routes/v1/claude-bridge');
 const { verifyApiKey } = require('./routes/v1/api-key');
 
 const app = express();
@@ -143,6 +144,7 @@ app.use('/api/v1/activity-logs', securityMiddleware.apiRateLimiter, verifyJwtOrA
 
 // Insights: POST requires X-API-Key, GET/DELETE requires JWT or X-API-Key
 app.use('/api/v1/insights', verifyJwtOrApiKey, insightsV1Routes);
+app.use('/api/v1/claude-bridge', securityMiddleware.apiRateLimiter, verifyJwtOrApiKey, claudeBridgeRoutes);
 
 app.use('/api/image-renamer', securityMiddleware.verifyToken, imageRenamerRoutes);
 
