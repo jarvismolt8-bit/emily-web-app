@@ -4,7 +4,9 @@ const { execFile } = require('child_process');
 
 const BRIDGE_DIR = '/tmp/claude-bridge';
 const LOG_PATH = path.join(BRIDGE_DIR, 'output.log');
-const TMUX_SESSION = 'claude';
+// Target: session 'work', window 'claude' — use session:window format to avoid
+// tmux resolving 'claude' as a window name inside the current session.
+const TMUX_TARGET = 'work:claude';
 const MAX_MESSAGE_LENGTH = 4000;
 const MAX_OUTPUT_LENGTH = 16384;
 const IDLE_POLL_INTERVAL = 500;
@@ -60,19 +62,15 @@ function truncateLog() {
 
 function checkSession() {
   return new Promise((resolve) => {
-    execFile('tmux', ['list-sessions', '-F', '#{session_name}'], (err, stdout) => {
-      if (err || !stdout.includes(TMUX_SESSION)) {
-        resolve(false);
-      } else {
-        resolve(true);
-      }
+    execFile('tmux', ['display-message', '-t', TMUX_TARGET, '-p', '#{session_name}'], (err) => {
+      resolve(!err);
     });
   });
 }
 
 function attachPipePane() {
   return new Promise((resolve) => {
-    execFile('tmux', ['pipe-pane', '-t', TMUX_SESSION, '-o', `cat >> ${LOG_PATH}`], (err) => {
+    execFile('tmux', ['pipe-pane', '-t', TMUX_TARGET, '-o', `cat >> ${LOG_PATH}`], (err) => {
       _pipePaneAttached = true;
       resolve(!err);
     });
@@ -81,7 +79,7 @@ function attachPipePane() {
 
 function sendKeys(text) {
   return new Promise((resolve, reject) => {
-    execFile('tmux', ['send-keys', '-t', TMUX_SESSION, text, 'Enter'], (err) => {
+    execFile('tmux', ['send-keys', '-t', TMUX_TARGET, text, 'Enter'], (err) => {
       if (err) reject(err);
       else resolve();
     });
@@ -90,7 +88,7 @@ function sendKeys(text) {
 
 function capturePane() {
   return new Promise((resolve, reject) => {
-    execFile('tmux', ['capture-pane', '-t', TMUX_SESSION, '-p', '-S', '-50'], (err, stdout) => {
+    execFile('tmux', ['capture-pane', '-t', TMUX_TARGET, '-p', '-S', '-50'], (err, stdout) => {
       if (err) reject(err);
       else resolve(stdout);
     });
@@ -99,7 +97,7 @@ function capturePane() {
 
 function getCurrentCommand() {
   return new Promise((resolve) => {
-    execFile('tmux', ['display-message', '-t', TMUX_SESSION, '-p', '#{pane_current_command}'], (err, stdout) => {
+    execFile('tmux', ['display-message', '-t', TMUX_TARGET, '-p', '#{pane_current_command}'], (err, stdout) => {
       if (err) resolve(null);
       else resolve(stdout.trim());
     });
@@ -231,7 +229,7 @@ function init() {
         log('info', 'pipe-pane attached');
       });
     } else {
-      log('warn', 'tmux session "claude" not found — bridge inactive');
+      log('warn', `tmux target "${TMUX_TARGET}" not found — bridge inactive`);
     }
   });
 }
