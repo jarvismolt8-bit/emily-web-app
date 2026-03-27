@@ -4,9 +4,9 @@ const { execFile } = require('child_process');
 
 const BRIDGE_DIR = '/tmp/claude-bridge';
 const LOG_PATH = path.join(BRIDGE_DIR, 'output.log');
-// Target: session 'work', window 'claude' — use session:window format to avoid
-// tmux resolving 'claude' as a window name inside the current session.
-const TMUX_TARGET = 'work:claude';
+// Use 'claude:' (trailing colon) to force tmux to match the SESSION named 'claude'
+// rather than a window named 'claude' inside the current session.
+const TMUX_TARGET = 'claude:';
 const MAX_MESSAGE_LENGTH = 4000;
 const MAX_OUTPUT_LENGTH = 16384;
 const IDLE_POLL_INTERVAL = 500;
@@ -229,7 +229,7 @@ function init() {
         log('info', 'pipe-pane attached');
       });
     } else {
-      log('warn', `tmux target "${TMUX_TARGET}" not found — bridge inactive`);
+      log('warn', 'tmux session "claude" not found — bridge inactive');
     }
   });
 }
