@@ -57,7 +57,10 @@ function sendKeys(text) {
   });
 }
 
-// Poll capture-pane until Claude Code shows the ❯ idle prompt without processing indicators
+// Poll capture-pane until Claude Code shows the ❯ idle prompt.
+// Only check the lines AFTER ❯ for processing indicators — the status bar
+// lives below the prompt, not above it. Historical response text above ❯
+// may still contain spinner words and must be ignored.
 function waitForPrompt() {
   return new Promise((resolve, reject) => {
     let promptCount = 0;
@@ -79,12 +82,29 @@ function waitForPrompt() {
         }
 
         const text = stdout.replace(STRIP_ANSI, '');
-        const tail = text.split('\n').slice(-15).join('\n');
+        const lines = text.split('\n');
 
-        const hasPrompt = tail.includes(PROMPT_CHAR);
-        const isProcessing = PROCESSING_PATTERN.test(tail);
+        // Find the last line containing ❯ (the input prompt)
+        let promptLineIdx = -1;
+        for (let i = lines.length - 1; i >= 0; i--) {
+          if (lines[i].includes(PROMPT_CHAR)) {
+            promptLineIdx = i;
+            break;
+          }
+        }
 
-        if (hasPrompt && !isProcessing) {
+        if (promptLineIdx === -1) {
+          // No prompt visible — Claude is processing
+          promptCount = 0;
+          setTimeout(poll, IDLE_POLL_INTERVAL);
+          return;
+        }
+
+        // Check only the lines BELOW the prompt (the live status bar)
+        const statusLines = lines.slice(promptLineIdx + 1).join('\n');
+        const isProcessing = PROCESSING_PATTERN.test(statusLines);
+
+        if (!isProcessing) {
           promptCount++;
         } else {
           promptCount = 0;
