@@ -1,5 +1,17 @@
 const WebSocket = require('ws');
 const { v4: uuidv4 } = require('uuid');
+const claudeBridge = require('./services/claude-bridge');
+
+function extractClaudePrompt(rawText) {
+  if (typeof rawText !== 'string') return null;
+  const lower = rawText.toLowerCase();
+  const triggers = ['tell claude ', 'ask claude ', 'claude:'];
+  for (const t of triggers) {
+    const idx = lower.indexOf(t);
+    if (idx !== -1) return rawText.slice(idx + t.length).trim();
+  }
+  return null;
+}
 
 /**
  * OpenClaw Gateway Client
@@ -181,6 +193,31 @@ class GatewayClient {
           content: text,
           timestamp: new Date().toISOString()
         });
+      }
+
+      // Claude bridge trigger detection
+      const prompt = extractClaudePrompt(text || '');
+      if (prompt) {
+        console.log('[Gateway] Claude trigger detected, forwarding to bridge');
+        claudeBridge.sendMessage(prompt)
+          .then(response => {
+            if (response) {
+              this.broadcastToAll({
+                type: 'message',
+                sender: 'claude',
+                content: response,
+                timestamp: new Date().toISOString()
+              });
+            }
+          })
+          .catch(err => {
+            this.broadcastToAll({
+              type: 'message',
+              sender: 'claude',
+              content: `[claude-bridge error] ${err.message}`,
+              timestamp: new Date().toISOString()
+            });
+          });
       }
       return;
     }
