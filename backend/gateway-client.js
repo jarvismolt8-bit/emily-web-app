@@ -199,6 +199,7 @@ class GatewayClient {
       const prompt = extractClaudePrompt(text || '');
       if (prompt) {
         console.log('[Gateway] Claude trigger detected, forwarding to bridge');
+        const sessionKey = message.payload?.sessionKey || 'telegram:main';
         claudeBridge.sendMessage(prompt)
           .then(response => {
             if (response) {
@@ -207,6 +208,10 @@ class GatewayClient {
                 sender: 'claude',
                 content: response,
                 timestamp: new Date().toISOString()
+              });
+              // Send response back to OpenClaw for Telegram delivery
+              this.sendChatMessage(sessionKey, response).catch(err => {
+                console.error('[Gateway] Failed to relay Claude response to OpenClaw:', err.message);
               });
             }
           })
@@ -217,6 +222,7 @@ class GatewayClient {
               content: `[claude-bridge error] ${err.message}`,
               timestamp: new Date().toISOString()
             });
+            this.sendChatMessage(sessionKey, `[claude-bridge error] ${err.message}`).catch(() => {});
           });
       }
       return;
