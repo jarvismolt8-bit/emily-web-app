@@ -43,7 +43,7 @@ hi
 | Module system | CommonJS — `require/module.exports` ONLY |
 | Database path | `backend/db/cashflow.db` |
 | Production DB users | admin, user — seeded with SHA256 hashed passwords |
-| Emily API Key | `cfm_c8fca68bf28e3e272670211894d12fa00cef3993a22622a778b5c1523698c7d7` |
+| Emily API Key | `cfm_9ebe271c5559514a3c33068bd470eb0b8cad214069beeff13a3df8342d48b57a` |
 | Staging DB | `backend/db/cashflow.db` (isolated copy) |
 | Production log dir | `/var/log/cashflow` |
 | Staging log dir | `/var/log/cashflow-staging` |

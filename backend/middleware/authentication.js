@@ -55,10 +55,9 @@ const validateRefreshToken = async (token, req) => {
     const data = JSON.parse(stored);
     const ipHash = crypto.createHash('sha256')
       .update(req.ip || 'unknown').digest('hex').slice(0, 16);
-    
+
     if (data.ipHash !== ipHash) {
-      await getRedis().del(`refresh:${token}`);
-      return null;
+      console.warn(`[Auth] Refresh token IP mismatch (allowed): stored=${data.ipHash}, current=${ipHash}`);
     }
     return data;
   } catch (err) {

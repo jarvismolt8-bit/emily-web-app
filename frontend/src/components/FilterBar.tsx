@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
-import { Search, Plus, Calendar } from 'lucide-react'
+import { Search, Plus, Calendar, Filter } from 'lucide-react'
 import {
   Select,
   SelectContent,
@@ -12,7 +12,7 @@ import {
 
 const CATEGORIES = ['All', 'Income', 'Investment', 'Food', 'Pet Food', 'Transport', 'Utilities', 'Shopping', 'Entertainment', 'Health', 'Airbnb', 'Bank', 'Other', 'Clothing']
 const CURRENCIES = ['All', 'PHP', 'USD', 'EUR']
-const DATE_RANGES = ['This month', 'Last month', 'Date range']
+const DATE_RANGES = ['This month', 'Last month', 'Custom']
 
 interface Filters {
   category: string
@@ -41,18 +41,14 @@ function getDateRangeValues(range: string): { startDate: string; endDate: string
   const month = now.getMonth()
 
   if (range === 'This month') {
-    const firstDay = new Date(year, month, 1)
-    const lastDay = new Date(year, month + 1, 0)
     return {
-      startDate: formatDate(firstDay),
-      endDate: formatDate(lastDay)
+      startDate: formatDate(new Date(year, month, 1)),
+      endDate: formatDate(new Date(year, month + 1, 0))
     }
   } else if (range === 'Last month') {
-    const firstDay = new Date(year, month - 1, 1)
-    const lastDay = new Date(year, month, 0)
     return {
-      startDate: formatDate(firstDay),
-      endDate: formatDate(lastDay)
+      startDate: formatDate(new Date(year, month - 1, 1)),
+      endDate: formatDate(new Date(year, month, 0))
     }
   }
   return { startDate: '', endDate: '' }
@@ -67,61 +63,68 @@ export default function FilterBar({ onFilterChange, onAddClick }: FilterBarProps
   const [endDate, setEndDate] = useState<string>('')
 
   useEffect(() => {
-    if (dateRange !== 'Date range') {
+    if (dateRange !== 'Custom') {
       const { startDate: start, endDate: end } = getDateRangeValues(dateRange)
       setStartDate(start)
       setEndDate(end)
     }
   }, [dateRange])
 
-  const emitChange = (newFilters: Partial<Filters>) => {
-    const updated = { 
-      category, 
-      currency, 
-      search, 
-      dateRange,
-      startDate,
-      endDate,
-      ...newFilters 
-    }
-    onFilterChange(updated)
-  }
+  const currentFilters = (): Filters => ({
+    category,
+    currency,
+    search,
+    dateRange,
+    startDate,
+    endDate,
+  })
 
   const handleDateRangeChange = (val: string) => {
     setDateRange(val)
-    if (val !== 'Date range') {
+    if (val !== 'Custom') {
       const { startDate: start, endDate: end } = getDateRangeValues(val)
       setStartDate(start)
       setEndDate(end)
-      emitChange({ dateRange: val, startDate: start, endDate: end })
     } else {
       setStartDate('')
       setEndDate('')
-      emitChange({ dateRange: val, startDate: '', endDate: '' })
     }
   }
 
-  const handleStartDateChange = (val: string) => {
-    const newStart = val || ''
-    setStartDate(newStart)
-    emitChange({ startDate: newStart })
+  const handleCategoryChange = (val: string) => {
+    setCategory(val)
   }
 
-  const handleEndDateChange = (val: string) => {
-    const newEnd = val || ''
-    setEndDate(newEnd)
-    emitChange({ endDate: newEnd })
+  const handleCurrencyChange = (val: string) => {
+    setCurrency(val)
+  }
+
+  const handleApply = () => {
+    onFilterChange(currentFilters())
+  }
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') handleApply()
   }
 
   return (
     <div className="flex flex-wrap items-center gap-3">
-      <Select
-        value={dateRange}
-        onValueChange={handleDateRangeChange}
-      >
+      <div className="relative flex-1 min-w-[200px] w-full md:w-auto md:flex-none">
+        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Input
+          type="text"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          onKeyDown={handleKeyDown}
+          placeholder="Search transactions..."
+          className="pl-9 w-full"
+        />
+      </div>
+
+      <Select value={dateRange} onValueChange={handleDateRangeChange}>
         <SelectTrigger className="w-[140px]">
           <Calendar className="h-4 w-4 mr-2" />
-          <SelectValue placeholder="Date range" />
+          <SelectValue placeholder="Date" />
         </SelectTrigger>
         <SelectContent>
           {DATE_RANGES.map(range => (
@@ -130,28 +133,27 @@ export default function FilterBar({ onFilterChange, onAddClick }: FilterBarProps
         </SelectContent>
       </Select>
 
-      {dateRange === 'Date range' && (
+      {dateRange === 'Custom' && (
         <>
           <Input
             type="date"
             value={startDate}
-            onChange={(e) => handleStartDateChange(e.target.value)}
-            className="w-[140px]"
+            onChange={(e) => setStartDate(e.target.value)}
+            onKeyDown={handleKeyDown}
+            className="w-[130px]"
           />
           <span className="text-muted-foreground">to</span>
           <Input
             type="date"
             value={endDate}
-            onChange={(e) => handleEndDateChange(e.target.value)}
-            className="w-[140px]"
+            onChange={(e) => setEndDate(e.target.value)}
+            onKeyDown={handleKeyDown}
+            className="w-[130px]"
           />
         </>
       )}
-      
-      <Select
-        value={category}
-        onValueChange={(val) => { setCategory(val); emitChange({ category: val }) }}
-      >
+
+      <Select value={category} onValueChange={handleCategoryChange}>
         <SelectTrigger className="w-[140px]">
           <SelectValue placeholder="Category" />
         </SelectTrigger>
@@ -161,11 +163,8 @@ export default function FilterBar({ onFilterChange, onAddClick }: FilterBarProps
           ))}
         </SelectContent>
       </Select>
-      
-      <Select
-        value={currency}
-        onValueChange={(val) => { setCurrency(val); emitChange({ currency: val }) }}
-      >
+
+      <Select value={currency} onValueChange={handleCurrencyChange}>
         <SelectTrigger className="w-[100px]">
           <SelectValue placeholder="Currency" />
         </SelectTrigger>
@@ -175,18 +174,12 @@ export default function FilterBar({ onFilterChange, onAddClick }: FilterBarProps
           ))}
         </SelectContent>
       </Select>
-      
-      <div className="relative flex-1 min-w-[200px]">
-        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input
-          type="text"
-          value={search}
-          onChange={(e) => { setSearch(e.target.value); emitChange({ search: e.target.value }) }}
-          placeholder="Search transactions..."
-          className="pl-9"
-        />
-      </div>
-      
+
+      <Button variant="outline" onClick={handleApply}>
+        <Filter className="h-4 w-4 mr-2" />
+        Filter
+      </Button>
+
       <Button onClick={onAddClick}>
         <Plus className="h-4 w-4 mr-2" />
         Add

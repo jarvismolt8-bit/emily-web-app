@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useCallback, useMemo } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { useAuth } from './hooks/useAuth'
 import PasswordGate from './components/PasswordGate'
@@ -12,11 +12,11 @@ import ImageRenamer from './components/ImageRenamer'
 import ChatWidget from './components/ChatWidget'
 import CashflowFormModal from './components/CashflowFormModal'
 import { cashflowAPI } from './api/cashflow'
-import { useRealtimeCashflow } from './hooks/useRealtimeData'
+import { useCashflowData } from './hooks/useRealtimeData'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
 import { ThemeToggle } from './components/ThemeToggle'
-import { LogOut, Wallet, ListTodo, Activity, Image, MessageCircle, BarChart2 } from 'lucide-react'
+import { LogOut, Wallet, ListTodo, Activity, MessageCircle, BarChart2 } from 'lucide-react'
 import { TooltipProvider } from '@/components/ui/tooltip'
 
 interface Filters {
@@ -55,7 +55,6 @@ function CashflowApp() {
   const [chatOpen, setChatOpen] = useState(false)
   const [cashflowModalOpen, setCashflowModalOpen] = useState(false)
   const [editingCashflow, setEditingCashflow] = useState<CashflowEntry | null>(null)
-  const [summary, setSummary] = useState<Summary>({ totalIncome: 0, totalExpenses: 0, balance: 0, transactionCount: 0 })
   const formatDate = (date: Date): string => {
   const year = date.getFullYear()
   const month = String(date.getMonth() + 1).padStart(2, '0')
@@ -89,13 +88,13 @@ const [filters, setFilters] = useState<Filters>({
 
   const fetchCashflow = useCallback(async () => {
     const { dateRange, startDate, endDate, ...filterParams } = filters
-    return cashflowAPI.getAll({ 
+    if (dateRange === 'Date range' && (!startDate || !endDate)) return []
+    return cashflowAPI.getAll({
       ...filterParams,
       startDate,
-      endDate,
-      ...(cashflowSortBy && { sortBy: cashflowSortBy, sortOrder: cashflowSortOrder }) 
+      endDate
     })
-  }, [filters, cashflowSortBy, cashflowSortOrder])
+  }, [filters])
 
   const handleCashflowFilter = useCallback((newFilters: Record<string, any> | null) => {
     if (newFilters) {
@@ -120,15 +119,37 @@ const [filters, setFilters] = useState<Filters>({
     }
   }, [])
 
-  const { data: entries, loading, refresh } = useRealtimeCashflow(fetchCashflow, 'cashflow-updates', handleCashflowFilter)
+  const { data: entries, loading, refresh } = useCashflowData(fetchCashflow, handleCashflowFilter)
 
-  useEffect(() => {
-    cashflowAPI.getSummary({ startDate: filters.startDate, endDate: filters.endDate }).then(setSummary).catch(console.error)
-  }, [entries, filters.startDate, filters.endDate])
+  const sortedEntries = useMemo(() => {
+    if (!cashflowSortBy) return entries
+    return [...entries].sort((a, b) => {
+      let valA: string | number = a[cashflowSortBy]
+      let valB: string | number = b[cashflowSortBy]
+      if (cashflowSortBy === 'date') {
+        valA = a.date + ' ' + a.time
+        valB = b.date + ' ' + b.time
+      }
+      if (cashflowSortBy === 'amount') {
+        valA = Number(a.amount)
+        valB = Number(b.amount)
+      }
+      if (valA < valB) return cashflowSortOrder === 'asc' ? -1 : 1
+      if (valA > valB) return cashflowSortOrder === 'asc' ? 1 : -1
+      return a.id < b.id ? -1 : 1
+    })
+  }, [entries, cashflowSortBy, cashflowSortOrder])
 
-  useEffect(() => {
-    refresh()
-  }, [filters, cashflowSortBy, cashflowSortOrder, refresh])
+  const summary = useMemo(() => {
+    const totalIncome = entries.filter(e => e.amount > 0).reduce((sum, e) => sum + e.amount, 0)
+    const totalExpenses = Math.abs(entries.filter(e => e.amount < 0).reduce((sum, e) => sum + e.amount, 0))
+    return {
+      totalIncome,
+      totalExpenses,
+      balance: totalIncome - totalExpenses,
+      transactionCount: entries.length
+    }
+  }, [entries])
 
   const handleFilterChange = (newFilters: Filters) => {
     setFilters(newFilters)
@@ -147,16 +168,11 @@ const [filters, setFilters] = useState<Filters>({
     }
   }
 
-  const getFilteredSummary = () => {
-    return cashflowAPI.getSummary({ startDate: filters.startDate, endDate: filters.endDate }).then(setSummary).catch(console.error)
-  }
-
   const handleDelete = async (id: string) => {
     if (window.confirm('Delete this transaction?')) {
       try {
         await cashflowAPI.delete(id)
         refresh()
-        getFilteredSummary()
       } catch (error) {
         console.error('Error deleting entry:', error)
       }
@@ -167,7 +183,6 @@ const [filters, setFilters] = useState<Filters>({
     try {
       await cashflowAPI.add(entry)
       refresh()
-      getFilteredSummary()
     } catch (error) {
       console.error('Error adding entry:', error)
     }
@@ -178,7 +193,6 @@ const [filters, setFilters] = useState<Filters>({
     try {
       await cashflowAPI.update(entry.id, entry)
       refresh()
-      getFilteredSummary()
     } catch (error) {
       console.error('Error updating entry:', error)
     }
@@ -250,10 +264,10 @@ const [filters, setFilters] = useState<Filters>({
               <TabsContent value="cashflow" className="mt-6 space-y-6">
                 <SummaryCards summary={summary} />
                 <FilterBar onFilterChange={handleFilterChange} onAddClick={handleOpenAddModal} />
-                {loading ? (
+                  {loading ? (
                   <div className="flex items-center justify-center py-12 text-muted-foreground">Loading...</div>
                 ) : (
-                  <CashflowTable entries={entries} onDelete={handleDelete} onEdit={handleOpenEditModal} sortBy={cashflowSortBy} sortOrder={cashflowSortOrder} onSort={handleCashflowSort} />
+                  <CashflowTable entries={sortedEntries} onDelete={handleDelete} onEdit={handleOpenEditModal} sortBy={cashflowSortBy} sortOrder={cashflowSortOrder} onSort={handleCashflowSort} />
                 )}
               </TabsContent>
 

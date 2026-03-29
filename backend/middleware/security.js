@@ -20,44 +20,44 @@ const securityHeaders = helmet({
 });
 
 const apiRateLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, max: 200,
+  windowMs: 15 * 60 * 1000, max: 1000,
   keyGenerator: (req) => req.user?.userId || req.ip,
   standardHeaders: true, legacyHeaders: false,
-  validate: { xForwardedForHeader: false }
+  validate: false
 });
 
 const loginRateLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, max: 10,
+  windowMs: 15 * 60 * 1000, max: 50,
   message: { error: 'Too many login attempts, please try again later' },
-  standardHeaders: true, legacyHeaders: false
+  standardHeaders: true, legacyHeaders: false, validate: false
 });
 
 const failedLoginRateLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, max: 3,
+  windowMs: 15 * 60 * 1000, max: 20,
   message: { error: 'Too many failed login attempts, account locked for 15 minutes' },
-  standardHeaders: true, legacyHeaders: false
+  standardHeaders: true, legacyHeaders: false, validate: false
 });
 
 const registerLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, max: 3,
-  message: { error: 'Too many registration attempts' }
+  message: { error: 'Too many registration attempts' }, validate: false
 });
 
 const refreshLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, max: 10,
+  windowMs: 15 * 60 * 1000, max: 100,
   keyGenerator: (req) => req.headers['x-forwarded-for'] || req.ip,
   message: { error: 'Too many refresh requests' },
   validate: false
 });
 
 const unauthenticatedLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, max: 50
+  windowMs: 15 * 60 * 1000, max: 50, validate: false
 });
 
 const sseLimiter = rateLimit({
   windowMs: 60 * 1000, max: 100,
   message: { error: 'Too many SSE connections' },
-  standardHeaders: true, legacyHeaders: false
+  standardHeaders: true, legacyHeaders: false, validate: false
 });
 
 const verifyToken = (req, res, next) => next();

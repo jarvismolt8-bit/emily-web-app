@@ -23,7 +23,8 @@ const CATEGORY_EMOJIS: Record<string, string> = {
   'Airbnb': '🛌',
   'Other': '📦',
   'Clothing': '👕',
-  'Bank': '🏦'
+  'Bank': '🏦',
+  'venued.app': '✨'
 }
 
 const CURRENCY_SYMBOLS: Record<string, string> = {

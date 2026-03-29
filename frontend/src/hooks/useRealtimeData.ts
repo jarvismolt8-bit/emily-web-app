@@ -29,6 +29,7 @@ export function useRealtimeData<T>(
   })
 
   const channelRef = useRef<BroadcastChannel | null>(null)
+  const requestIdRef = useRef(0)
 
   useEffect(() => {
     if (broadcastChannelName) {
@@ -93,11 +94,14 @@ export function useRealtimeData<T>(
   useSSE(handleEvent)
 
   const load = useCallback(async () => {
+    const reqId = ++requestIdRef.current
     setState(prev => ({ ...prev, loading: true, error: null }))
     try {
       const data = await fetchData()
+      if (reqId !== requestIdRef.current) return
       setState({ data, loading: false, error: null })
     } catch (err) {
+      if (reqId !== requestIdRef.current) return
       setState(prev => ({
         ...prev,
         loading: false,
@@ -150,4 +154,57 @@ export function useRealtimeTasks(
     broadcastChannelName,
     onFilter
   )
+}
+
+export function useCashflowData(
+  fetchFn: () => Promise<any[]>,
+  onFilter?: FilterCallback
+): RealtimeState<any> {
+  const [state, setState] = useState<RealtimeState<any>>({
+    data: [],
+    loading: true,
+    error: null
+  })
+
+  const requestIdRef = useRef(0)
+
+  const handleEvent = useCallback((event: SSEEvent) => {
+    const eventType = event.type
+    
+    if (eventType === 'cashflow:filter') {
+      if (onFilter) {
+        onFilter(event.filters)
+      }
+      return
+    }
+    
+  }, [onFilter])
+
+  useSSE(handleEvent)
+
+  const load = useCallback(async () => {
+    const reqId = ++requestIdRef.current
+    setState(prev => ({ ...prev, loading: true, error: null }))
+    try {
+      const data = await fetchFn()
+      if (reqId !== requestIdRef.current) return
+      setState({ data, loading: false, error: null })
+    } catch (err) {
+      if (reqId !== requestIdRef.current) return
+      setState(prev => ({
+        ...prev,
+        loading: false,
+        error: err instanceof Error ? err.message : 'Failed to load data'
+      }))
+    }
+  }, [fetchFn])
+
+  useEffect(() => {
+    load()
+  }, [load])
+
+  return {
+    ...state,
+    refresh: load
+  }
 }

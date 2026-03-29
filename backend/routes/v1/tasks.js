@@ -3,25 +3,6 @@ const router = express.Router();
 const { sendSuccess, sendError } = require('../../middleware/response');
 const tasksRepo = require('../../repositories/tasks.repository');
 const { logActivityFromReq } = require('../../utils/activity-logger');
-const fs = require('fs');
-const path = require('path');
-
-const DOCS_DIR = path.join(__dirname, '../../../documentation');
-
-function getDocFilePath(taskId) {
-  const basePath = path.join(DOCS_DIR, `${taskId}-improve-task.md`);
-  if (fs.existsSync(basePath)) {
-    return basePath;
-  }
-  
-  const files = fs.readdirSync(DOCS_DIR);
-  const matchingFile = files.find(f => f.startsWith(`${taskId}-`) && f.endsWith('.md'));
-  if (matchingFile) {
-    return path.join(DOCS_DIR, matchingFile);
-  }
-  
-  return basePath;
-}
 
 router.get('/:id/documentation', (req, res) => {
   try {
@@ -30,14 +11,8 @@ router.get('/:id/documentation', (req, res) => {
       return sendError(res, 'RESOURCE_NOT_FOUND', 'Task not found', 404);
     }
 
-    const docPath = getDocFilePath(req.params.id);
-    
-    if (fs.existsSync(docPath)) {
-      const content = fs.readFileSync(docPath, 'utf8');
-      sendSuccess(res, { content, exists: true });
-    } else {
-      sendSuccess(res, { content: '', exists: false });
-    }
+    const content = task.documentation || '';
+    sendSuccess(res, { content, exists: !!task.documentation });
   } catch (error) {
     sendError(res, 'INTERNAL_ERROR', error.message, 500);
   }
@@ -55,22 +30,7 @@ router.post('/:id/documentation', (req, res) => {
       return sendError(res, 'VALIDATION_ERROR', 'Content is required', 400);
     }
 
-    const docPath = getDocFilePath(req.params.id);
-    const today = new Date().toLocaleDateString('en-US', { 'month': 'short', 'day': '2-digit', 'year': 'numeric' });
-    
-    let finalContent = content;
-    
-    if (fs.existsSync(docPath)) {
-      const existing = fs.readFileSync(docPath, 'utf8');
-      const updatedMatch = existing.match(/^\*\*Updated:\*\* .+$/m);
-      if (updatedMatch) {
-        finalContent = content.replace(/^\*\*Updated:\*\* .+$/m, `**Updated:** ${today}`);
-      }
-    } else {
-      finalContent = content.replace(/^\*\*Updated:\*\* .+$/m, `**Updated:** ${today}`);
-    }
-
-    fs.writeFileSync(docPath, finalContent, 'utf8');
+    tasksRepo.update(req.params.id, { documentation: content });
 
     logActivityFromReq(
       req,
@@ -80,7 +40,7 @@ router.post('/:id/documentation', (req, res) => {
       'success'
     );
 
-    sendSuccess(res, { path: docPath }, 'Documentation updated');
+    sendSuccess(res, { success: true }, 'Documentation updated');
   } catch (error) {
     sendError(res, 'INTERNAL_ERROR', error.message, 500);
   }

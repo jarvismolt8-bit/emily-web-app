@@ -312,7 +312,7 @@ Emily queries the cashflow and tasks APIs, decides which of 4 chart types best r
    ```bash
    curl -X POST http://localhost:3002/api/v1/insights \
      -H "Content-Type: application/json" \
-     -H "X-API-Key: cfm_c8fca68bf28e3e272670211894d12fa00cef3993a22622a778b5c1523698c7d7" \
+     -H "X-API-Key: cfm_9ebe271c5559514a3c33068bd470eb0b8cad214069beeff13a3df8342d48b57a" \
      -d '{
        "session_id": "test-session-001",
        "requested_by": "test_user",
@@ -437,11 +437,11 @@ Emily queries the cashflow and tasks APIs, decides which of 4 chart types best r
      ```bash
      # Cashflow data
      curl -s "http://localhost:3001/api/v1/cashflow?startDate=YYYY-MM-DD&endDate=YYYY-MM-DD" \
-       -H "X-API-Key: cfm_c8fca68bf28e3e272670211894d12fa00cef3993a22622a778b5c1523698c7d7" \
+       -H "X-API-Key: cfm_9ebe271c5559514a3c33068bd470eb0b8cad214069beeff13a3df8342d48b57a" \
        -H "X-Source: telegram"
      # Tasks data
      curl -s "http://localhost:3001/api/v1/tasks" \
-       -H "X-API-Key: cfm_c8fca68bf28e3e272670211894d12fa00cef3993a22622a778b5c1523698c7d7" \
+       -H "X-API-Key: cfm_9ebe271c5559514a3c33068bd470eb0b8cad214069beeff13a3df8342d48b57a" \
        -H "X-Source: telegram"
      ```
    - **Step 3 — Analyze + select chart type:**
@@ -458,7 +458,7 @@ Emily queries the cashflow and tasks APIs, decides which of 4 chart types best r
      ```bash
      curl -s -X POST "http://localhost:3001/api/v1/insights" \
        -H "Content-Type: application/json" \
-       -H "X-API-Key: cfm_c8fca68bf28e3e272670211894d12fa00cef3993a22622a778b5c1523698c7d7" \
+       -H "X-API-Key: cfm_9ebe271c5559514a3c33068bd470eb0b8cad214069beeff13a3df8342d48b57a" \
        -H "X-Source: telegram" \
        -d '...'
      ```

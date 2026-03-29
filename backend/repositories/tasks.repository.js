@@ -6,7 +6,7 @@ const PRIORITY_ORDER = { high: 0, medium: 1, low: 2 };
 const tasksRepo = {
   findAll({ sortBy, sortOrder, status } = {}) {
     const db = getDb();
-    let sql = 'SELECT * FROM tasks';
+    let sql = 'SELECT id, name, description, date, time, status, priority, created_at, updated_at, archived_at FROM tasks';
     const params = [];
 
     if (status) {
@@ -47,8 +47,8 @@ const tasksRepo = {
   create(data, source = 'web_app') {
     const id = this.generateId();
     getDb().prepare(`
-      INSERT INTO tasks (id, name, description, date, time, status, priority)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO tasks (id, name, description, date, time, status, priority, documentation)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       id,
       (data.name || '').trim(),
@@ -56,7 +56,8 @@ const tasksRepo = {
       data.date || '',
       data.time || '',
       data.status || 'backlog',
-      data.priority || 'medium'
+      data.priority || 'medium',
+      data.documentation || ''
     );
     const task = this.findById(id);
     
@@ -73,7 +74,7 @@ const tasksRepo = {
 
     const fields = [];
     const params = [];
-    for (const key of ['name', 'description', 'date', 'time', 'status', 'priority']) {
+    for (const key of ['name', 'description', 'date', 'time', 'status', 'priority', 'documentation']) {
       if (data[key] !== undefined) {
         fields.push(`${key} = ?`);
         params.push(key === 'name' ? data[key].trim() : data[key]);
