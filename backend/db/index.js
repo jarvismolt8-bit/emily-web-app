@@ -15,6 +15,20 @@ function getDb() {
     db.pragma('cache_size = -20000');
     db.pragma('temp_store = MEMORY');
 
+    // Health check: refuse to start with an empty or corrupt database
+    const tables = db.prepare("SELECT name FROM sqlite_master WHERE type='table'").all();
+    const requiredTables = ['cashflow', 'tasks', 'activity_logs'];
+    const missing = requiredTables.filter(t => !tables.some(row => row.name === t));
+    if (missing.length > 0) {
+      db.close();
+      db = null;
+      throw new Error(
+        `DATABASE HEALTH CHECK FAILED: Missing tables: ${missing.join(', ')}. ` +
+        `DB path: ${DB_PATH}. Restore from backup at /var/backups/cashflow-manager/ ` +
+        `or run schema: node -e "require('./db/index').getDb()" after applying schema.sql`
+      );
+    }
+
     // Idempotent migration: add archived_at column if missing
     const cols = db.pragma('table_info(tasks)');
     const hasArchivedAt = cols.some(c => c.name === 'archived_at');
