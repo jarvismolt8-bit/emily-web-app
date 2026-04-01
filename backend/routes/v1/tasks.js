@@ -271,21 +271,4 @@ router.delete('/', (req, res) => {
   }
 });
 
-router.post('/filter', (req, res) => {
-  try {
-    const { filterStore } = require('../../server');
-    const password = req.headers['x-password'];
-    const filters = req.body;
-    
-    filterStore.set(`tasks:${password}`, filters);
-    
-    const eventBus = require('../../events');
-    eventBus.emit('task:filter', { filters, source: req.source || 'telegram' });
-    
-    sendSuccess(res, { filters }, 'Task filter set');
-  } catch (error) {
-    sendError(res, 'INTERNAL_ERROR', error.message, 500);
-  }
-});
-
 module.exports = router;

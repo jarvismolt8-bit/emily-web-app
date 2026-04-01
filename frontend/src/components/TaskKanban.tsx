@@ -134,7 +134,7 @@ function BoardColumn({ column, tasks, onEdit }: { column: Column; tasks: Task[];
   return (
     <div
       ref={setNodeRef}
-      className={`border rounded-lg p-4 bg-muted/30 min-h-[150px] md:min-h-[400px] w-[280px] flex-shrink-0 transition-colors ${isOver ? 'ring-2 ring-primary bg-muted/50' : ''}`}
+      className={`border rounded-lg p-4 bg-muted/30 min-h-[150px] md:min-h-[400px] w-[280px] md:min-w-[320px] md:flex-1 flex-shrink-0 transition-colors ${isOver ? 'ring-2 ring-primary bg-muted/50' : ''}`}
     >
       <div className="flex items-center justify-between mb-4">
         <h3 className="font-semibold">{column.title}</h3>
