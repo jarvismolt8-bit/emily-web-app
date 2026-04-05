@@ -10,7 +10,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 
-const CATEGORIES = ['All', 'Income', 'Investment', 'Food', 'Pet Food', 'Transport', 'Utilities', 'Shopping', 'Entertainment', 'Health', 'Airbnb', 'Bank', 'Other', 'Clothing']
+const CATEGORIES = ['All', 'Income', 'Investment', 'Food', 'Pet Food', 'Transport', 'Utilities', 'Shopping', 'Entertainment', 'Health', 'Airbnb', 'Bank', 'Other', 'Clothing', 'venued.app']
 const CURRENCIES = ['All', 'PHP', 'USD', 'EUR']
 const DATE_RANGES = ['This month', 'Last month', 'Custom']
 
