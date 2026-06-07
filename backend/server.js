@@ -5,10 +5,15 @@ const WebSocket = require('ws');
 const swaggerUi = require('swagger-ui-express');
 const YAML = require('yamljs');
 const path = require('path');
-require('dotenv').config();
+const envFile = process.env.NODE_ENV === 'staging' ? '.env.staging' : '.env';
+require('dotenv').config({ path: require('path').join(__dirname, envFile) });
 
+const features = require('./config/features');
 const { getDb } = require('./db');
 getDb();
+
+const { initRedis, isRedisHealthy } = require('./lib/redis');
+initRedis().catch(err => console.error('[Server] Redis init failed:', err.message));
 
 const eventBus = require('./events');
 
@@ -27,6 +32,19 @@ const tasksRepo = require('./repositories/tasks.repository');
 const { logActivity } = require('./utils/activity-logger');
 const { logLoginAttempt } = require('./utils/security-logger');
 
+const securityMiddleware = require('./middleware/security');
+const authMiddleware = require('./middleware/authentication');
+const authRoutes = require('./routes/auth');
+const authV1Routes = require('./routes/v1/auth');
+const cookieParser = require('cookie-parser');
+
+const { monitorNoOrigin, corsMiddleware } = require('./middleware/cors');
+const { logAuthEvent } = require('./middleware/audit');
+const { requireNotLocked } = require('./middleware/accountLockout');
+const { requirePermission } = require('./middleware/permissions');
+const apiKeyRoutes = require('./routes/v1/api-key');
+const { verifyApiKey } = require('./routes/v1/api-key');
+
 const app = express();
 const PORT = process.env.PORT || 3001;
 const WEB_PASSWORD = process.env.WEB_PASSWORD;
@@ -35,9 +53,49 @@ const filterStore = new Map();
 
 module.exports = { app, filterStore };
 
-app.use(cors());
+// Request timing
+app.use((req, res, next) => {
+  req.startTime = Date.now();
+  next();
+});
+
+// Security headers
+app.use(securityMiddleware.securityHeaders);
+
+// CORS
+app.use(monitorNoOrigin);
+app.use(corsMiddleware);
+
+// Audit logging helper (logs after response)
+app.use((req, res, next) => {
+  const start = req.startTime;
+  res.on('finish', () => {
+    if (req.user) {
+      logAuthEvent({
+        action: 'api_response',
+        userId: req.user.userId || req.user.id,
+        path: req.path,
+        method: req.method,
+        statusCode: res.statusCode,
+        responseTimeMs: Date.now() - start
+      });
+    } else if (req.path.startsWith('/api/v1/auth')) {
+      logAuthEvent({
+        action: 'auth_attempt',
+        path: req.path,
+        method: req.method,
+        statusCode: res.statusCode
+      });
+    }
+  });
+  next();
+});
+
+app.use(cookieParser());
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+
+app.use(securityMiddleware.unauthenticatedLimiter);
 
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument, {
   customCss: '.swagger-ui .topbar { display: none }',
@@ -55,9 +113,50 @@ const verifyPassword = (req, res, next) => {
   }
 };
 
-app.use('/api/v1/cashflow', verifyPassword, sourceMiddleware, cashflowV1Routes);
-app.use('/api/v1/tasks', verifyPassword, sourceMiddleware, tasksV1Routes);
-app.use('/api/v1/activity-logs', verifyPassword, sourceMiddleware, activityLogsV1Routes);
+// Health endpoint
+app.get('/api/v1/health', (req, res) => {
+  res.json({
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    redis: isRedisHealthy() ? 'healthy' : 'unavailable',
+    jwt: !!process.env.JWT_SECRET,
+    node_version: process.version
+  });
+});
+
+// Conditional JWT-based v1 routes based on feature flag
+if (features.jwtEnabled) {
+  // v1 Auth routes (JWT-based)
+  app.use('/api/v1/auth', authV1Routes);
+
+  // API Key management (admin only)
+  app.use('/api/v1/api-key',
+    authMiddleware.verifyAccessToken,
+    requirePermission('admin'),
+    apiKeyRoutes
+  );
+
+  // Protected v1 data routes — JWT OR API key
+  const verifyJwtOrApiKey = (req, res, next) => {
+    if (req.headers.authorization && req.headers.authorization.startsWith('Bearer ')) {
+      return authMiddleware.verifyAccessToken(req, res, next);
+    }
+    if (req.headers['x-api-key']) {
+      return verifyApiKey(req, res, next);
+    }
+    if (features.legacyPasswordEnabled) {
+      const pw = req.headers['x-password'];
+      if (pw && pw === process.env.WEB_PASSWORD) return next();
+    }
+    return res.status(401).json({ error: 'Authentication required' });
+  };
+
+  app.use('/api/v1/cashflow', securityMiddleware.apiRateLimiter, verifyJwtOrApiKey, sourceMiddleware, cashflowV1Routes);
+  app.use('/api/v1/tasks', securityMiddleware.apiRateLimiter, verifyJwtOrApiKey, sourceMiddleware, tasksV1Routes);
+  app.use('/api/v1/activity-logs', securityMiddleware.apiRateLimiter, verifyJwtOrApiKey, sourceMiddleware, activityLogsV1Routes);
+}
+app.use('/api/image-renamer', securityMiddleware.verifyToken, imageRenamerRoutes);
+
 
 app.use('/api/image-renamer', verifyPassword, imageRenamerRoutes);
 

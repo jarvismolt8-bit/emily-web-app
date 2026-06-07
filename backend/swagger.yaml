@@ -43,6 +43,10 @@ tags:
     description: Deprecated - use v1 endpoints
   - name: Chat
     description: Real-time WebSocket chat
+  - name: v1 Auth
+    description: Authentication endpoints (JWT-based)
+  - name: v1 API Key
+    description: API key management for M2M authentication
 
 security:
   - PasswordAuth: []
@@ -54,6 +58,16 @@ components:
       in: header
       name: X-Password
       description: Shared password for API access
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT access token (15 minute expiry)
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: API key for M2M authentication (prefixed with cfm_)
 
   schemas:
     CashflowTransaction:
@@ -1301,3 +1315,242 @@ paths:
           description: Switching to WebSocket protocol
         '401':
           description: Unauthorized
+
+  /api/v1/health:
+    get:
+      tags: [v1 Auth]
+      summary: Health check endpoint
+      security: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                  timestamp:
+                    type: string
+                  redis:
+                    type: string
+                  jwt:
+                    type: boolean
+                  node_version:
+                    type: string
+
+  /api/v1/auth/login:
+    post:
+      tags: [v1 Auth]
+      summary: Login with username or email
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                username:
+                  type: string
+                email:
+                  type: string
+                password:
+                  type: string
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  accessToken:
+                    type: string
+                  user:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                      username:
+                        type: string
+                      email:
+                        type: string
+                      permissions:
+                        type: array
+                        items:
+                          type: string
+
+  /api/v1/auth/refresh:
+    post:
+      tags: [v1 Auth]
+      summary: Refresh access token
+      security: []
+      responses:
+        '200':
+          description: Token refreshed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  accessToken:
+                    type: string
+
+  /api/v1/auth/logout:
+    post:
+      tags: [v1 Auth]
+      summary: Logout and clear refresh token
+      security: []
+      responses:
+        '200':
+          description: Logged out
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+
+  /api/v1/auth/revoke:
+    post:
+      tags: [v1 Auth]
+      summary: Revoke refresh token
+      security: []
+      responses:
+        '200':
+          description: Token revoked
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+
+  /api/v1/api-key/generate:
+    post:
+      tags: [v1 API Key]
+      summary: Generate new API key
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, user_id]
+              properties:
+                name:
+                  type: string
+                user_id:
+                  type: integer
+                permissions:
+                  type: array
+                  items:
+                    type: string
+                expires_in_days:
+                  type: integer
+      responses:
+        '201':
+          description: API key generated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  apiKey:
+                    type: string
+                  name:
+                    type: string
+                  permissions:
+                    type: array
+                    items:
+                      type: string
+                  expires_at:
+                    type: string
+                    format: date-time
+                  message:
+                    type: string
+
+  /api/v1/api-key/list:
+    get:
+      tags: [v1 API Key]
+      summary: List API keys for a user
+      security: []
+      parameters:
+        - name: user_id
+          in: query
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: List of API keys
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  keys:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: integer
+                        name:
+                          type: string
+                        permissions:
+                          type: array
+                          items:
+                            type: string
+                        user_id:
+                          type: integer
+                        expires_at:
+                          type: string
+                          format: date-time
+                        created_at:
+                          type: string
+                          format: date-time
+                        last_used_at:
+                          type: string
+                          format: date-time
+
+  /api/v1/api-key/revoke/{id}:
+    delete:
+      tags: [v1 API Key]
+      summary: Revoke an API key
+      security: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: API key revoked
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string

@@ -47,3 +47,38 @@ CREATE INDEX IF NOT EXISTS idx_activity_timestamp ON activity_logs(timestamp);
 CREATE INDEX IF NOT EXISTS idx_activity_action_type ON activity_logs(action_type);
 CREATE INDEX IF NOT EXISTS idx_activity_source ON activity_logs(source);
 CREATE INDEX IF NOT EXISTS idx_activity_status ON activity_logs(status);
+
+CREATE TABLE IF NOT EXISTS users (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  username TEXT NOT NULL UNIQUE,
+  email TEXT NOT NULL UNIQUE,
+  password TEXT NOT NULL,
+  permissions TEXT NOT NULL DEFAULT '[]',
+  token_version INTEGER DEFAULT 1,
+  created_at INTEGER DEFAULT (unixepoch()),
+  updated_at INTEGER DEFAULT (unixepoch())
+);
+
+CREATE TABLE IF NOT EXISTS api_keys (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  key_hash TEXT NOT NULL UNIQUE,
+  name TEXT NOT NULL,
+  permissions TEXT NOT NULL DEFAULT '[]',
+  user_id INTEGER NOT NULL,
+  expires_at INTEGER,
+  created_at INTEGER DEFAULT (unixepoch()),
+  last_used_at INTEGER,
+  FOREIGN KEY (user_id) REFERENCES users(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_api_keys_user_id ON api_keys(user_id);
+CREATE INDEX IF NOT EXISTS idx_api_keys_key_hash ON api_keys(key_hash);
+
+CREATE TABLE IF NOT EXISTS account_lockouts (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  email TEXT NOT NULL UNIQUE,
+  locked_until INTEGER NOT NULL,
+  attempt_count INTEGER DEFAULT 0
+);
+
+CREATE INDEX IF NOT EXISTS idx_account_lockouts_email ON account_lockouts(email);
